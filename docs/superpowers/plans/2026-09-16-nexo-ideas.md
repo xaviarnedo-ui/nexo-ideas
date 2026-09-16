@@ -1951,3 +1951,213 @@ git commit -m "feat: arranque de la app y navegación entre vistas"
 ```
 
 ---
+
+## Task 12: Acceso de Claude (`nexo_cli.py`) y README
+
+Sin dependencias de pip (solo la librería estándar) para no añadir un paso
+de instalación — coherente con el espíritu "sin build tools" del resto del
+proyecto.
+
+**Files:**
+- Create: `nexo_cli.py`
+- Create: `.env.example`
+- Create: `README.md`
+
+**Interfaces:**
+- Consumes: `SUPABASE_URL` y `SUPABASE_ANON_KEY` desde `.env` (mismos valores que Task 1/3, copiados a mano por Xavi).
+- Produces: comandos de terminal (`listar`/`crear`/`actualizar`/`borrar`) que Claude usa en sesiones futuras para leer y editar `categorias`, `ideas`, `notas`, `etiquetas`, `idea_etiquetas` y `nexos` directamente contra Supabase — ninguna otra tarea del plan depende de esto, es el punto de entrada para trabajo *posterior* al plan.
+
+- [ ] **Step 1: Write `nexo_cli.py`**
+
+```python
+#!/usr/bin/env python3
+"""CLI para que Claude lea/escriba la base de datos de NEXO Ideas desde
+sesiones de Claude Code, sin pasar por la interfaz web. Solo librería
+estándar (sin pip install). Lee SUPABASE_URL y SUPABASE_ANON_KEY de .env
+(junto a este script).
+
+Uso:
+  python3 nexo_cli.py listar ideas
+  python3 nexo_cli.py crear ideas '{"titulo":"...", "categoria_id":"..."}'
+  python3 nexo_cli.py actualizar ideas <id> '{"estado":"validada"}'
+  python3 nexo_cli.py borrar notas <id>
+"""
+import json
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ORDEN = {"categorias": "orden", "ideas": "created_at", "notas": "created_at", "nexos": "created_at"}
+
+
+def leer_env():
+    ruta = Path(__file__).parent / ".env"
+    valores = {}
+    for linea in ruta.read_text().splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith("#") or "=" not in linea:
+            continue
+        clave, _, valor = linea.partition("=")
+        valores[clave.strip()] = valor.strip()
+    return valores
+
+
+ENV = leer_env()
+BASE = ENV["SUPABASE_URL"].rstrip("/") + "/rest/v1"
+HEADERS = {
+    "apikey": ENV["SUPABASE_ANON_KEY"],
+    "Authorization": "Bearer " + ENV["SUPABASE_ANON_KEY"],
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+}
+
+
+def peticion(metodo, ruta, cuerpo=None):
+    datos = json.dumps(cuerpo).encode() if cuerpo is not None else None
+    req = urllib.request.Request(BASE + ruta, data=datos, method=metodo, headers=HEADERS)
+    try:
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read() or b"null")
+    except urllib.error.HTTPError as e:
+        sys.exit("Error " + str(e.code) + ": " + e.read().decode())
+
+
+def listar(tabla):
+    ruta = "/" + tabla + "?select=*"
+    if ORDEN.get(tabla):
+        ruta += "&order=" + ORDEN[tabla]
+    return peticion("GET", ruta)
+
+
+def crear(tabla, cuerpo):
+    return peticion("POST", "/" + tabla, cuerpo)
+
+
+def actualizar(tabla, id_, cambios):
+    return peticion("PATCH", "/" + tabla + "?id=eq." + id_, cambios)
+
+
+def borrar(tabla, id_):
+    return peticion("DELETE", "/" + tabla + "?id=eq." + id_)
+
+
+def main():
+    if len(sys.argv) < 3:
+        sys.exit(__doc__)
+    accion, tabla = sys.argv[1], sys.argv[2]
+    if accion == "listar":
+        resultado = listar(tabla)
+    elif accion == "crear":
+        resultado = crear(tabla, json.loads(sys.argv[3]))
+    elif accion == "actualizar":
+        resultado = actualizar(tabla, sys.argv[3], json.loads(sys.argv[4]))
+    elif accion == "borrar":
+        resultado = borrar(tabla, sys.argv[3])
+    else:
+        sys.exit(__doc__)
+    print(json.dumps(resultado, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
+```
+
+- [ ] **Step 2: Write `.env.example`**
+
+```
+# Copia este archivo a .env (que NO se sube al repo) para que nexo_cli.py
+# pueda leer/escribir la base de datos desde sesiones de Claude Code.
+# Mismos valores que en supabase-client.js (Task 3, Settings -> API).
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+```
+
+- [ ] **Step 3: Write `README.md`**
+
+```markdown
+# NEXO Ideas
+
+Espacio personal de Xavi para capturar, organizar y conectar las ideas de
+su consulta de PNI. PWA (HTML+CSS+JS, sin build tools) con Supabase como
+base de datos real — se escribe y se lee desde cualquier dispositivo al
+instante. Ver el diseño completo en
+[docs/superpowers/specs/2026-09-16-nexo-ideas-design.md](docs/superpowers/specs/2026-09-16-nexo-ideas-design.md).
+
+## Primer arranque
+
+1. Crear el proyecto en [supabase.com](https://supabase.com) y ejecutar
+   `supabase/schema.sql` y `supabase/seed.sql` en el SQL Editor.
+2. Pegar `SUPABASE_URL` y la `anon key` (Settings → API) en
+   `supabase-client.js`.
+3. Elegir una contraseña, calcular su hash SHA-256 (instrucciones en
+   `auth-gate.js`) y pegarlo en `PASSWORD_HASH`.
+4. `python3 -m http.server 4610` y abrir `http://localhost:4610/index.html`.
+
+## Publicar (una vez)
+
+```bash
+gh repo create nexo-ideas --public --source=. --remote=origin --push
+gh api -X POST repos/xaviarnedo-ui/nexo-ideas/pages -f build_type=legacy -f 'source[branch]=main' -f 'source[path]=/'
+```
+
+URL: `https://xaviarnedo-ui.github.io/nexo-ideas/`. GitHub Pages tarda
+~1 min en actualizarse tras cada `git push`. Si tocas `styles.css` o algún
+`.js`, sube también el `?v=N` en `index.html` y el `CACHE` de `sw.js`.
+
+## Acceso de Claude a los datos
+
+```bash
+cp .env.example .env   # una vez, con tus credenciales reales
+python3 nexo_cli.py listar ideas
+python3 nexo_cli.py crear notas '{"idea_id":"...", "contenido":"..."}'
+python3 nexo_cli.py actualizar ideas <id> '{"estado":"en_desarrollo"}'
+```
+
+## Estructura de archivos
+
+| Archivo | Qué es |
+|---|---|
+| `index.html` | Estructura de la página (gate, tablero/mapa/ajustes, modal de captura, panel de detalle) |
+| `styles.css` | Sistema visual (tokens, todos los componentes) |
+| `supabase-client.js` | Cliente Supabase (URL + anon key) |
+| `auth-gate.js` | Pantalla de contraseña |
+| `db.js` | Acceso a datos sobre Supabase + cola offline |
+| `state.js` | Estado en memoria + suscripción a Supabase Realtime |
+| `capture.js` | Botón flotante y modal de captura rápida |
+| `board.js` | Vista Tablero (búsqueda, filtro por etiqueta) |
+| `detail.js` | Panel de detalle (editar, notas, nexos) |
+| `map.js` | Vista Mapa (grafo radial en SVG) |
+| `settings.js` | Ajustes de categorías y etiquetas |
+| `app.js` | Arranque y navegación entre pestañas |
+| `supabase/schema.sql`, `supabase/seed.sql` | Esquema y datos de ejemplo (se ejecutan a mano en Supabase) |
+| `nexo_cli.py`, `.env.example` | Acceso de Claude a los datos desde la terminal |
+| `manifest.json`, `sw.js`, `icons/`, `gen_icons.py` | PWA |
+```
+
+- [ ] **Step 4: Xavi copia y rellena `.env`**
+
+```bash
+cp .env.example .env
+```
+
+Rellenar con los mismos valores ya pegados en `supabase-client.js`.
+
+- [ ] **Step 5: Verificación manual**
+
+```bash
+python3 nexo_cli.py listar categorias
+```
+
+Debe imprimir las 5 categorías sembradas como JSON. Probar también
+`crear`/`actualizar`/`borrar` sobre una idea de prueba y confirmar el
+cambio en el `Table Editor` de Supabase.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add nexo_cli.py .env.example README.md
+git commit -m "docs: README y acceso de Claude por CLI"
+```
+
+---
