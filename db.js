@@ -41,16 +41,24 @@
     }
   }
 
+  var procesando = false;
+
   async function procesarCola() {
-    var cola = leerCola();
-    while (cola.length) {
-      try {
-        await ejecutarOp(cola[0]);
-        cola.shift();
-        guardarCola(cola);
-      } catch (e) {
-        break; // seguimos con red mala; se reintenta en el próximo trigger
+    if (procesando) return;
+    procesando = true;
+    try {
+      var cola = leerCola();
+      while (cola.length) {
+        try {
+          await ejecutarOp(cola[0]);
+          cola.shift();
+          guardarCola(cola);
+        } catch (e) {
+          break; // seguimos con red mala; se reintenta en el próximo trigger
+        }
       }
+    } finally {
+      procesando = false;
     }
   }
 
