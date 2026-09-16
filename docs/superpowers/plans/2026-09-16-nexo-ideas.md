@@ -1886,3 +1886,68 @@ git commit -m "feat: ajustes de categorías y etiquetas"
 ```
 
 ---
+
+## Task 11: Arranque de la app y navegación (`app.js`)
+
+Gracias a que cada módulo de vista se auto-registra con `STATE.on(render)`
+(Tasks 7–10), `app.js` no necesita saber nada de renderizado ni de carga de
+datos — solo decide qué `.view` está visible. Esta es también la primera
+vez que todas las piezas están juntas, así que el paso de verificación de
+este task es un recorrido completo de la app, de punta a punta.
+
+**Files:**
+- Create: `app.js`
+
+**Interfaces:**
+- Consumes: `.tab[data-view]`, `.view[data-view]` (Task 2).
+- Produces: nada consumido por otro módulo — es el punto de entrada final.
+
+- [ ] **Step 1: Write `app.js`**
+
+```js
+/* NEXO Ideas — arranque: solo decide qué pestaña está visible.
+   La carga de datos la dispara state.js al oír "nexo:unlocked";
+   cada vista se repinta sola vía STATE.on(render). */
+(function () {
+  "use strict";
+
+  var tabs = document.querySelectorAll(".tab");
+  var vistas = document.querySelectorAll(".view");
+
+  function activar(nombre) {
+    tabs.forEach(function (tab) {
+      tab.setAttribute("aria-current", tab.getAttribute("data-view") === nombre ? "page" : "false");
+    });
+    vistas.forEach(function (vista) {
+      vista.hidden = vista.getAttribute("data-view") !== nombre;
+    });
+  }
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () { activar(tab.getAttribute("data-view")); });
+  });
+
+  activar("tablero");
+})();
+```
+
+- [ ] **Step 2: Verificación manual — recorrido completo**
+
+Con `python3 -m http.server 4610` y la app ya desbloqueada:
+
+1. Pestañas: click en "Mapa" → se oculta el Tablero y se ve el grafo; click en "Ajustes" → se ven categorías/etiquetas; click en "Tablero" → vuelve. En todo momento debe haber exactamente una vista visible.
+2. Captura: crear una idea nueva desde el botón "+" → aparece de inmediato en su columna del Tablero y como nodo nuevo en el Mapa.
+3. Detalle: abrirla, subir su estado a "Validada" → el punto de la tarjeta se pone verde sin recargar.
+4. Buscador y filtro por etiqueta del Tablero siguen funcionando con los datos reales (no solo los de prueba del Task 4/6).
+5. Offline: red en "Offline" en devtools, capturar una idea → se guarda igual (optimista) y `DB.colaPendiente().length` sube; red "Online" → baja sola a `0` en segundos y la idea queda en Supabase.
+6. Recargar la página entera: la contraseña ya no se pide (persistida), y todos los datos siguen ahí.
+7. Borrar la idea de prueba para dejar la base solo con los datos semilla + lo que Xavi quiera conservar.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app.js
+git commit -m "feat: arranque de la app y navegación entre vistas"
+```
+
+---
