@@ -1099,3 +1099,187 @@ git commit -m "feat: captura rápida de ideas"
 ```
 
 ---
+
+## Task 7: Tablero (`board.js`)
+
+Patrón de renderizado usado en este y todos los módulos de vista
+siguientes (`detail.js`, `map.js`, `settings.js`): cada uno llama
+`STATE.on(render)` una vez al cargar el script, así que se vuelve a pintar
+solo cada vez que cambian los datos (carga inicial, edición local
+optimista, o un evento de Realtime) — `app.js` (Task 11) no necesita saber
+nada de renderizado, solo de qué pestaña está visible.
+
+**Files:**
+- Create: `board.js`
+- Modify: `styles.css` (añade las reglas del tablero al final del archivo)
+
+**Interfaces:**
+- Consumes: `STATE.categorias`, `STATE.ideas`, `STATE.etiquetas`, `STATE.etiquetasDeIdea`, `STATE.notasDeIdea`, `STATE.on` (Task 5); `Detalle.abrir(ideaId)` (Task 8 — se escribe antes de que exista, ver nota abajo); `#vista-tablero` (Task 2).
+- Produces: `window.Tablero.render()` (sin más consumidores previstos; se expone por consistencia con el resto de módulos de vista).
+
+**Nota de orden:** este módulo llama a `Detalle.abrir(...)`, que se define en el Task 8. Como es una llamada dentro de un manejador de click (no en tiempo de carga del script), el orden de los `<script>` no importa — `Detalle` ya existe en el objeto `window` para cuando el usuario llega a tocar una tarjeta.
+
+- [ ] **Step 1: Write `board.js`**
+
+```js
+/* NEXO Ideas — vista Tablero (por defecto). */
+(function () {
+  "use strict";
+
+  var filtroTexto = "";
+  var filtroEtiquetaId = null;
+
+  var ESTADOS = {
+    suelta: { color: "var(--estado-suelta)" },
+    en_desarrollo: { color: "var(--estado-desarrollo)" },
+    validada: { color: "var(--estado-validada)" }
+  };
+
+  function coincide(idea) {
+    if (filtroEtiquetaId) {
+      var ids = STATE.etiquetasDeIdea(idea.id).map(function (t) { return t.id; });
+      if (ids.indexOf(filtroEtiquetaId) === -1) return false;
+    }
+    if (filtroTexto) {
+      var texto = (idea.titulo + " " + (idea.cuerpo || "") + " " +
+        STATE.notasDeIdea(idea.id).map(function (n) { return n.contenido; }).join(" ")).toLowerCase();
+      if (texto.indexOf(filtroTexto) === -1) return false;
+    }
+    return true;
+  }
+
+  function tarjeta(idea) {
+    var card = document.createElement("button");
+    card.type = "button";
+    card.className = "tarjeta-idea";
+    var estado = ESTADOS[idea.estado] || ESTADOS.suelta;
+
+    var punto = document.createElement("span");
+    punto.className = "punto-estado";
+    punto.style.background = estado.color;
+    card.appendChild(punto);
+
+    var titulo = document.createElement("span");
+    titulo.className = "tarjeta-titulo";
+    titulo.textContent = idea.titulo;
+    card.appendChild(titulo);
+
+    if (idea._pendiente) {
+      var pendiente = document.createElement("span");
+      pendiente.className = "tarjeta-pendiente";
+      pendiente.title = "Pendiente de sincronizar";
+      pendiente.textContent = "⏳";
+      card.appendChild(pendiente);
+    }
+
+    var etqBox = document.createElement("div");
+    etqBox.className = "tarjeta-etiquetas";
+    STATE.etiquetasDeIdea(idea.id).forEach(function (t) {
+      var pill = document.createElement("span");
+      pill.className = "mini-etiqueta";
+      pill.textContent = t.nombre;
+      etqBox.appendChild(pill);
+    });
+    card.appendChild(etqBox);
+
+    card.addEventListener("click", function () { Detalle.abrir(idea.id); });
+    return card;
+  }
+
+  function render() {
+    var root = document.getElementById("vista-tablero");
+    if (!root) return;
+    root.innerHTML = "";
+    if (!STATE.categorias.length) return;
+
+    var barra = document.createElement("div");
+    barra.className = "tablero-barra";
+
+    var buscador = document.createElement("input");
+    buscador.type = "search";
+    buscador.placeholder = "Buscar...";
+    buscador.value = filtroTexto;
+    buscador.addEventListener("input", function () {
+      filtroTexto = buscador.value.trim().toLowerCase();
+      render();
+    });
+    barra.appendChild(buscador);
+
+    var filtroBox = document.createElement("div");
+    filtroBox.className = "chip-group";
+    STATE.etiquetas.forEach(function (t) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.textContent = t.nombre;
+      var activo = filtroEtiquetaId === t.id;
+      chip.setAttribute("aria-pressed", activo ? "true" : "false");
+      if (activo) { chip.style.background = "var(--text)"; chip.style.color = "#fff"; chip.style.borderColor = "var(--text)"; }
+      chip.addEventListener("click", function () {
+        filtroEtiquetaId = activo ? null : t.id;
+        render();
+      });
+      filtroBox.appendChild(chip);
+    });
+    barra.appendChild(filtroBox);
+    root.appendChild(barra);
+
+    var columnas = document.createElement("div");
+    columnas.className = "tablero-columnas";
+    STATE.categorias.forEach(function (cat) {
+      var ideas = STATE.ideas.filter(function (i) { return i.categoria_id === cat.id && coincide(i); });
+      var col = document.createElement("section");
+      col.className = "tablero-columna";
+      col.style.setProperty("--col-accent", cat.color_acento);
+      var h = document.createElement("h3");
+      h.textContent = cat.nombre + " (" + ideas.length + ")";
+      col.appendChild(h);
+      ideas.forEach(function (idea) { col.appendChild(tarjeta(idea)); });
+      columnas.appendChild(col);
+    });
+    root.appendChild(columnas);
+  }
+
+  STATE.on(render);
+  window.Tablero = { render: render };
+})();
+```
+
+- [ ] **Step 2: Append to `styles.css`**
+
+```css
+
+/* ---- Tablero ---- */
+.tablero-barra { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1rem; }
+.tablero-barra input[type="search"] {
+  padding: .5rem .8rem; border: 1px solid var(--border); border-radius: 8px; min-width: 200px;
+}
+.tablero-columnas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; align-items: start; }
+.tablero-columna {
+  background: var(--bg-elevated); border: 1px solid var(--border); border-top: 3px solid var(--col-accent);
+  border-radius: var(--radius); padding: .9rem; display: flex; flex-direction: column; gap: .5rem;
+}
+.tablero-columna h3 { font-size: .95rem; color: var(--text-muted); font-family: var(--font-mono); font-weight: 500; text-transform: uppercase; letter-spacing: .02em; }
+.tarjeta-idea {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; text-align: left;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: .6rem .7rem;
+  width: 100%;
+}
+.tarjeta-titulo { font-weight: 600; flex: 1; }
+.tarjeta-pendiente { font-size: .8rem; }
+.tarjeta-etiquetas { display: flex; gap: .3rem; flex-wrap: wrap; width: 100%; }
+.mini-etiqueta { font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); background: var(--border); border-radius: 4px; padding: .1rem .4rem; }
+```
+
+- [ ] **Step 3: Verificación manual**
+
+Recargar la app: deben verse las 5 columnas con las 15 ideas sembradas repartidas, cada una con su punto de estado gris (todas "suelta" en el seed) y, en "Sin límites (Peter Attia)", la etiqueta "sueño". Escribir "glucosa" en el buscador → solo debe quedar visible "Picos de glucosa" (y cualquier otra que la mencione). Tocar la etiqueta "insulina" → solo deben quedar las ideas etiquetadas con ella. Tocar una tarjeta no debe dar error en consola aunque `detail.js` no exista todavía (el Task 8 define `Detalle`; hasta entonces se verá un error de `Detalle is not defined` al hacer click, que es esperado y se resuelve en el siguiente task).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add board.js styles.css
+git commit -m "feat: vista Tablero con búsqueda y filtro por etiqueta"
+```
+
+---
