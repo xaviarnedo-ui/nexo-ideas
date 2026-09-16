@@ -880,3 +880,222 @@ git commit -m "feat: capa de datos con cola offline"
 ```
 
 ---
+
+## Task 5: Estado global y tiempo real (`state.js`)
+
+**Files:**
+- Create: `state.js`
+
+**Interfaces:**
+- Consumes: `DB.listarCategorias/listarIdeas/listarNotas/listarEtiquetas/listarIdeaEtiquetas/listarNexos` (Task 4), `window.NEXO_DB` (Task 3), evento `document` `"nexo:unlocked"` (Task 3).
+- Produces (`window.STATE`, consumido por `capture.js`, `board.js`, `detail.js`, `map.js`, `settings.js`):
+  - Arrays en memoria: `STATE.categorias`, `STATE.ideas`, `STATE.notas`, `STATE.etiquetas`, `STATE.ideaEtiquetas`, `STATE.nexos`.
+  - `STATE.cargarTodo()` → `Promise<void>`, rellena los arrays de arriba.
+  - `STATE.on(fn)` → registra `fn()` para que se llame cada vez que cambia cualquier colección (tras `cargarTodo()` y tras cada evento de Realtime).
+  - `STATE.notificar()` → dispara esos mismos listeners a mano; lo usan `capture.js`/`detail.js`/`settings.js` tras aplicar un cambio optimista al array en memoria, para no esperar al viaje de ida y vuelta de Realtime.
+  - `STATE.categoriaPorId(id)`, `STATE.ideaPorId(id)`, `STATE.notasDeIdea(ideaId)`, `STATE.etiquetasDeIdea(ideaId)`, `STATE.nexosDeIdea(ideaId)` (esta última devuelve las **ideas** conectadas, no los `nexos` en crudo).
+  - Evento `document` `"nexo:estado-listo"`, disparado una vez tras el primer `cargarTodo()` — señal para que `app.js` (Task 6) monte las vistas.
+
+- [ ] **Step 1: Write `state.js`**
+
+```js
+/* NEXO Ideas — estado en memoria + tiempo real. Vuelve a pedir la tabla
+   entera en cada evento de Realtime (dataset pequeño, de un usuario) en
+   vez de aplicar parches incrementales — más simple y sin bugs de sync. */
+(function () {
+  "use strict";
+
+  var listeners = [];
+  var listo = false;
+
+  var STATE = {
+    categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: []
+  };
+
+  function notificar() {
+    listeners.forEach(function (fn) { fn(); });
+  }
+
+  STATE.on = function (fn) { listeners.push(fn); };
+  // expuesto para que capture.js/detail.js/settings.js puedan aplicar un
+  // cambio optimista al array en memoria y re-renderizar sin esperar al
+  // viaje de ida y vuelta de Realtime
+  STATE.notificar = notificar;
+
+  STATE.cargarTodo = async function () {
+    var r = await Promise.all([
+      DB.listarCategorias(), DB.listarIdeas(), DB.listarNotas(),
+      DB.listarEtiquetas(), DB.listarIdeaEtiquetas(), DB.listarNexos()
+    ]);
+    STATE.categorias = r[0]; STATE.ideas = r[1]; STATE.notas = r[2];
+    STATE.etiquetas = r[3]; STATE.ideaEtiquetas = r[4]; STATE.nexos = r[5];
+    notificar();
+    if (!listo) { listo = true; document.dispatchEvent(new CustomEvent("nexo:estado-listo")); }
+  };
+
+  var RECARGA = {
+    categorias: function () { return DB.listarCategorias().then(function (d) { STATE.categorias = d; }); },
+    ideas: function () { return DB.listarIdeas().then(function (d) { STATE.ideas = d; }); },
+    notas: function () { return DB.listarNotas().then(function (d) { STATE.notas = d; }); },
+    etiquetas: function () { return DB.listarEtiquetas().then(function (d) { STATE.etiquetas = d; }); },
+    idea_etiquetas: function () { return DB.listarIdeaEtiquetas().then(function (d) { STATE.ideaEtiquetas = d; }); },
+    nexos: function () { return DB.listarNexos().then(function (d) { STATE.nexos = d; }); }
+  };
+
+  function suscribirTiempoReal() {
+    var canal = window.NEXO_DB.channel("nexo-ideas-cambios");
+    Object.keys(RECARGA).forEach(function (tabla) {
+      canal.on("postgres_changes", { event: "*", schema: "public", table: tabla }, function () {
+        RECARGA[tabla]().then(notificar);
+      });
+    });
+    canal.subscribe();
+  }
+
+  STATE.categoriaPorId = function (id) {
+    return STATE.categorias.find(function (c) { return c.id === id; });
+  };
+  STATE.ideaPorId = function (id) {
+    return STATE.ideas.find(function (i) { return i.id === id; });
+  };
+  STATE.notasDeIdea = function (ideaId) {
+    return STATE.notas.filter(function (n) { return n.idea_id === ideaId; });
+  };
+  STATE.etiquetasDeIdea = function (ideaId) {
+    var ids = STATE.ideaEtiquetas.filter(function (e) { return e.idea_id === ideaId; }).map(function (e) { return e.etiqueta_id; });
+    return STATE.etiquetas.filter(function (t) { return ids.indexOf(t.id) !== -1; });
+  };
+  STATE.nexosDeIdea = function (ideaId) {
+    return STATE.nexos
+      .filter(function (n) { return n.idea_id_a === ideaId || n.idea_id_b === ideaId; })
+      .map(function (n) { return STATE.ideaPorId(n.idea_id_a === ideaId ? n.idea_id_b : n.idea_id_a); })
+      .filter(Boolean);
+  };
+
+  document.addEventListener("nexo:unlocked", function () {
+    STATE.cargarTodo();
+    suscribirTiempoReal();
+  });
+
+  window.STATE = STATE;
+})();
+```
+
+- [ ] **Step 2: Verificación manual**
+
+Recargar la app desbloqueada; en consola: `STATE.ideas.length` debe ser `15` (las sembradas) más cualquiera creada en el Task 4. Abrir el `Table Editor` de Supabase en otra pestaña, editar a mano el `titulo` de una idea, y comprobar (sin recargar la app) que en unos segundos `STATE.ideaPorId("<ese id>").titulo` ya refleja el cambio — confirma que Realtime funciona de verdad.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add state.js
+git commit -m "feat: estado global y suscripción a tiempo real"
+```
+
+---
+
+## Task 6: Captura rápida (`capture.js`)
+
+**Files:**
+- Create: `capture.js`
+
+**Interfaces:**
+- Consumes: `STATE.categorias`, `STATE.etiquetas`, `STATE.ideaEtiquetas` + `STATE.notificar()` (Task 5); `DB.crearIdea`, `DB.crearEtiqueta`, `DB.etiquetarIdea` (Task 4); `#btn-capturar`, `#modal-captura`, `#form-captura`, `#captura-titulo`, `#captura-categorias`, `#captura-etiquetas`, `#captura-cancelar` (Task 2).
+- Produces: ninguna función pública — es un módulo autocontenido que solo escucha clicks/submits. El patrón "buscar etiqueta existente por nombre o crearla" que define aquí (`etiquetaPorNombreOCrear`) se repite igual en `detail.js` (Task 8).
+
+- [ ] **Step 1: Write `capture.js`**
+
+```js
+/* NEXO Ideas — captura rápida (botón flotante + modal). */
+(function () {
+  "use strict";
+
+  var fab = document.getElementById("btn-capturar");
+  var modal = document.getElementById("modal-captura");
+  var form = document.getElementById("form-captura");
+  var tituloInput = document.getElementById("captura-titulo");
+  var categoriasBox = document.getElementById("captura-categorias");
+  var etiquetasInput = document.getElementById("captura-etiquetas");
+  var cancelarBtn = document.getElementById("captura-cancelar");
+  var categoriaSeleccionada = null;
+
+  function renderChipsCategoria() {
+    categoriasBox.innerHTML = "";
+    STATE.categorias.forEach(function (cat, i) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip";
+      chip.textContent = cat.nombre;
+      var seleccionada = (categoriaSeleccionada || STATE.categorias[0].id) === cat.id;
+      if (i === 0 && !categoriaSeleccionada) categoriaSeleccionada = cat.id;
+      chip.setAttribute("aria-pressed", seleccionada ? "true" : "false");
+      chip.style.background = seleccionada ? cat.color_acento : "transparent";
+      chip.style.borderColor = cat.color_acento;
+      chip.style.color = seleccionada ? "#fff" : cat.color_acento;
+      chip.addEventListener("click", function () {
+        categoriaSeleccionada = cat.id;
+        renderChipsCategoria();
+      });
+      categoriasBox.appendChild(chip);
+    });
+  }
+
+  function abrir() {
+    categoriaSeleccionada = null;
+    tituloInput.value = "";
+    etiquetasInput.value = "";
+    renderChipsCategoria();
+    modal.hidden = false;
+    tituloInput.focus();
+  }
+
+  function cerrar() {
+    modal.hidden = true;
+  }
+
+  async function etiquetaPorNombreOCrear(nombre) {
+    var existente = STATE.etiquetas.find(function (t) { return t.nombre.toLowerCase() === nombre; });
+    if (existente) return existente;
+    var creada = await DB.crearEtiqueta(nombre);
+    STATE.etiquetas.push(creada);
+    return creada;
+  }
+
+  fab.addEventListener("click", abrir);
+  cancelarBtn.addEventListener("click", cerrar);
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var titulo = tituloInput.value.trim();
+    if (!titulo || !categoriaSeleccionada) return;
+
+    var idea = await DB.crearIdea({ titulo: titulo, categoria_id: categoriaSeleccionada });
+    STATE.ideas.unshift(idea);
+
+    var nombres = etiquetasInput.value.split(",")
+      .map(function (s) { return s.trim().toLowerCase(); })
+      .filter(Boolean);
+    for (var i = 0; i < nombres.length; i++) {
+      var etiqueta = await etiquetaPorNombreOCrear(nombres[i]);
+      await DB.etiquetarIdea(idea.id, etiqueta.id);
+      STATE.ideaEtiquetas.push({ idea_id: idea.id, etiqueta_id: etiqueta.id });
+    }
+
+    STATE.notificar();
+    cerrar();
+  });
+})();
+```
+
+- [ ] **Step 2: Verificación manual**
+
+Con la app desbloqueada: tocar el "+", escribir un título, dejar la categoría por defecto, añadir `prueba, captura` en etiquetas, Guardar. Confirmar en el `Table Editor` de Supabase que aparecen la fila en `ideas` y las dos filas en `etiquetas`/`idea_etiquetas`. Repetir con las herramientas de red en "Offline": el modal debe cerrarse igual (guardado optimista) y `DB.colaPendiente().length` debe subir.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add capture.js
+git commit -m "feat: captura rápida de ideas"
+```
+
+---
