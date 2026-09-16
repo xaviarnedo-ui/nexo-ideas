@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NEXO Ideas</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#f7f5f2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,500&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <form id="gate-form" class="gate-card">
+    <h1>NEXO Ideas</h1>
+    <p>Introduce la contraseña</p>
+    <input id="gate-input" type="password" autocomplete="current-password" required>
+    <button type="submit">Entrar</button>
+    <p id="gate-error" class="gate-error" hidden>Contraseña incorrecta.</p>
+  </form>
+</div>
+
+<div id="app" class="app" hidden>
+  <header class="topbar">
+    <span class="brand">NEXO Ideas</span>
+    <nav class="tabs">
+      <button class="tab" data-view="tablero" aria-current="page">Tablero</button>
+      <button class="tab" data-view="mapa">Mapa</button>
+      <button class="tab" data-view="ajustes">Ajustes</button>
+    </nav>
+  </header>
+
+  <main id="views">
+    <section id="vista-tablero" class="view" data-view="tablero"></section>
+    <section id="vista-mapa" class="view" data-view="mapa" hidden></section>
+    <section id="vista-ajustes" class="view" data-view="ajustes" hidden></section>
+  </main>
+
+  <button id="btn-capturar" class="fab" aria-label="Nueva idea">+</button>
+
+  <div id="modal-captura" class="modal" hidden>
+    <form id="form-captura" class="modal-card">
+      <h2>Nueva idea</h2>
+      <input id="captura-titulo" type="text" placeholder="Título" required>
+      <div id="captura-categorias" class="chip-group"></div>
+      <input id="captura-etiquetas" type="text" placeholder="Etiquetas (separadas por coma)">
+      <div class="modal-actions">
+        <button type="button" id="captura-cancelar">Cancelar</button>
+        <button type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+
+  <aside id="panel-detalle" class="panel" hidden></aside>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js?v=1"></script>
+<script src="auth-gate.js?v=1"></script>
+<script src="db.js?v=1"></script>
+<script src="state.js?v=1"></script>
+<script src="capture.js?v=1"></script>
+<script src="board.js?v=1"></script>
+<script src="detail.js?v=1"></script>
+<script src="map.js?v=1"></script>
+<script src="settings.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
