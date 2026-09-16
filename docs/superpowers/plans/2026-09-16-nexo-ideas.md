@@ -2161,3 +2161,50 @@ git commit -m "docs: README y acceso de Claude por CLI"
 ```
 
 ---
+
+## Task 13: Publicar en GitHub Pages
+
+**Esta tarea crea un repositorio público y lo publica en una URL real —
+antes de ejecutar `gh repo create ... --public` o el comando de Pages, el
+ejecutor (Claude o Xavi) debe pedir confirmación explícita, incluso si el
+resto del plan ya se ha ejecutado sin pausas.** No es una acción reversible
+sin esfuerzo (cambia de nombre/borra un repo, gestiona quién lo ve), y cae
+dentro de "publicar contenido público" — no de "regular".
+
+**Files:** ninguno nuevo — esta tarea ejecuta comandos, no escribe código.
+
+**Interfaces:** ninguna — es el último paso, no lo consume nada más.
+
+- [ ] **Step 1: Confirmar con Xavi antes de continuar**
+
+Antes de ejecutar el paso 2, preguntar explícitamente: "¿Creo el repositorio
+público `nexo-ideas` en GitHub y lo publico en Pages?" y esperar un sí claro.
+
+- [ ] **Step 2: Crear el repo y publicar**
+
+```bash
+cd ~/Desktop/nexo-ideas
+gh repo create nexo-ideas --public --source=. --remote=origin --push
+gh api -X POST repos/xaviarnedo-ui/nexo-ideas/pages -f build_type=legacy -f 'source[branch]=main' -f 'source[path]=/'
+```
+
+- [ ] **Step 3: Verificación manual**
+
+Esperar ~1 minuto y abrir `https://xaviarnedo-ui.github.io/nexo-ideas/` en
+el navegador (o añadirla a la pantalla de inicio del móvil): debe pedir la
+contraseña real elegida en el Task 3 y, tras entrarla, mostrar el mismo
+tablero que en local. Confirmar que capturar una idea desde el móvil (con
+datos móviles, no wifi de casa) también se guarda — es la prueba real del
+caso de uso "se me ocurre algo en la calle".
+
+- [ ] **Step 4: Actualizar README**
+
+Añadir la URL real de producción al principio de `README.md`, sustituyendo
+cualquier mención genérica.
+
+```bash
+git add README.md
+git commit -m "docs: URL de producción"
+git push
+```
+
