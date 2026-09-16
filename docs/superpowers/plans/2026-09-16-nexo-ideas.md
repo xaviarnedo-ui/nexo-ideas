@@ -1701,3 +1701,188 @@ git commit -m "feat: vista Mapa de nodos"
 ```
 
 ---
+
+## Task 10: Ajustes — categorías y etiquetas (`settings.js`)
+
+**Files:**
+- Create: `settings.js`
+- Modify: `styles.css` (añade las reglas de ajustes al final del archivo)
+
+**Interfaces:**
+- Consumes: `STATE.categorias`, `STATE.etiquetas`, `STATE.ideaEtiquetas`, `STATE.notificar`, `STATE.on` (Task 5); `DB.actualizarCategoria`, `DB.crearCategoria`, `DB.renombrarEtiqueta`, `DB.borrarEtiqueta`, `DB.etiquetarIdea`, `DB.desetiquetarIdea` (Task 4); `#vista-ajustes` (Task 2).
+- Produces: `window.Ajustes.render()` (mismo patrón que `board.js`/`map.js`).
+
+- [ ] **Step 1: Write `settings.js`**
+
+```js
+/* NEXO Ideas — Ajustes: categorías y etiquetas. */
+(function () {
+  "use strict";
+
+  function seccionCategorias() {
+    var sec = document.createElement("div"); sec.className = "ajustes-seccion";
+    var h = document.createElement("h3"); h.textContent = "Categorías"; sec.appendChild(h);
+
+    STATE.categorias.slice().sort(function (a, b) { return a.orden - b.orden; }).forEach(function (cat) {
+      var fila = document.createElement("div"); fila.className = "ajustes-fila";
+
+      var nombreInput = document.createElement("input");
+      nombreInput.type = "text"; nombreInput.value = cat.nombre;
+      nombreInput.addEventListener("blur", async function () {
+        if (nombreInput.value.trim() && nombreInput.value !== cat.nombre) {
+          cat.nombre = nombreInput.value.trim();
+          await DB.actualizarCategoria(cat.id, { nombre: cat.nombre });
+          STATE.notificar();
+        }
+      });
+      fila.appendChild(nombreInput);
+
+      var colorInput = document.createElement("input");
+      colorInput.type = "color"; colorInput.value = cat.color_acento;
+      colorInput.addEventListener("change", async function () {
+        cat.color_acento = colorInput.value;
+        await DB.actualizarCategoria(cat.id, { color_acento: cat.color_acento });
+        STATE.notificar();
+      });
+      fila.appendChild(colorInput);
+
+      var ordenInput = document.createElement("input");
+      ordenInput.type = "number"; ordenInput.value = cat.orden; ordenInput.className = "ajustes-orden";
+      ordenInput.addEventListener("blur", async function () {
+        var nuevo = parseInt(ordenInput.value, 10);
+        if (!isNaN(nuevo) && nuevo !== cat.orden) {
+          cat.orden = nuevo;
+          await DB.actualizarCategoria(cat.id, { orden: nuevo });
+          STATE.notificar();
+        }
+      });
+      fila.appendChild(ordenInput);
+
+      sec.appendChild(fila);
+    });
+
+    var form = document.createElement("form"); form.className = "ajustes-nueva";
+    form.innerHTML = '<input type="text" placeholder="Nueva categoría" required><input type="color" value="#4f46e5"><button type="submit">Añadir</button>';
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var inputs = form.querySelectorAll("input");
+      var nombre = inputs[0].value.trim();
+      if (!nombre) return;
+      var nueva = await DB.crearCategoria({ nombre: nombre, color_acento: inputs[1].value, orden: STATE.categorias.length + 1 });
+      STATE.categorias.push(nueva);
+      STATE.notificar();
+      form.reset();
+    });
+    sec.appendChild(form);
+    return sec;
+  }
+
+  async function fusionarEtiquetas(origenId, destinoId) {
+    var relaciones = STATE.ideaEtiquetas.filter(function (e) { return e.etiqueta_id === origenId; });
+    for (var i = 0; i < relaciones.length; i++) {
+      var rel = relaciones[i];
+      var yaTiene = STATE.ideaEtiquetas.some(function (e) { return e.idea_id === rel.idea_id && e.etiqueta_id === destinoId; });
+      if (!yaTiene) {
+        await DB.etiquetarIdea(rel.idea_id, destinoId);
+        STATE.ideaEtiquetas.push({ idea_id: rel.idea_id, etiqueta_id: destinoId });
+      }
+      await DB.desetiquetarIdea(rel.idea_id, origenId);
+    }
+    STATE.ideaEtiquetas = STATE.ideaEtiquetas.filter(function (e) { return e.etiqueta_id !== origenId; });
+    await DB.borrarEtiqueta(origenId);
+    STATE.etiquetas = STATE.etiquetas.filter(function (e) { return e.id !== origenId; });
+    STATE.notificar();
+  }
+
+  function seccionEtiquetas() {
+    var sec = document.createElement("div"); sec.className = "ajustes-seccion";
+    var h = document.createElement("h3"); h.textContent = "Etiquetas"; sec.appendChild(h);
+
+    STATE.etiquetas.forEach(function (t) {
+      var fila = document.createElement("div"); fila.className = "ajustes-fila";
+
+      var nombreInput = document.createElement("input");
+      nombreInput.type = "text"; nombreInput.value = t.nombre;
+      nombreInput.addEventListener("blur", async function () {
+        if (nombreInput.value.trim() && nombreInput.value !== t.nombre) {
+          t.nombre = nombreInput.value.trim();
+          await DB.renombrarEtiqueta(t.id, t.nombre);
+          STATE.notificar();
+        }
+      });
+      fila.appendChild(nombreInput);
+
+      var fusionarSelect = document.createElement("select");
+      var vacio = document.createElement("option"); vacio.value = ""; vacio.textContent = "Fusionar con...";
+      fusionarSelect.appendChild(vacio);
+      STATE.etiquetas.filter(function (o) { return o.id !== t.id; }).forEach(function (o) {
+        var opt = document.createElement("option"); opt.value = o.id; opt.textContent = o.nombre;
+        fusionarSelect.appendChild(opt);
+      });
+      fusionarSelect.addEventListener("change", async function () {
+        if (!fusionarSelect.value) return;
+        if (confirm('Todas las ideas con "' + t.nombre + '" pasarán a tener la otra etiqueta, y "' + t.nombre + '" se borrará. ¿Continuar?')) {
+          await fusionarEtiquetas(t.id, fusionarSelect.value);
+        }
+      });
+      fila.appendChild(fusionarSelect);
+
+      var borrarBtn = document.createElement("button");
+      borrarBtn.type = "button"; borrarBtn.textContent = "Borrar";
+      borrarBtn.addEventListener("click", async function () {
+        if (!confirm('¿Borrar la etiqueta "' + t.nombre + '"?')) return;
+        await DB.borrarEtiqueta(t.id);
+        STATE.etiquetas = STATE.etiquetas.filter(function (e) { return e.id !== t.id; });
+        STATE.ideaEtiquetas = STATE.ideaEtiquetas.filter(function (e) { return e.etiqueta_id !== t.id; });
+        STATE.notificar();
+      });
+      fila.appendChild(borrarBtn);
+
+      sec.appendChild(fila);
+    });
+    return sec;
+  }
+
+  function render() {
+    var root = document.getElementById("vista-ajustes");
+    if (!root) return;
+    root.innerHTML = "";
+    if (!STATE.categorias.length) return;
+    root.appendChild(seccionCategorias());
+    root.appendChild(seccionEtiquetas());
+  }
+
+  STATE.on(render);
+  window.Ajustes = { render: render };
+})();
+```
+
+- [ ] **Step 2: Append to `styles.css`**
+
+```css
+
+/* ---- Ajustes ---- */
+.ajustes-seccion { margin-bottom: 1.6rem; }
+.ajustes-seccion h3 { font-family: var(--font-mono); font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); font-weight: 500; margin-bottom: .6rem; }
+.ajustes-fila { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+.ajustes-fila input[type="text"] { flex: 1; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 6px; }
+.ajustes-fila select { padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 6px; }
+.ajustes-orden { width: 60px !important; flex: none !important; }
+.ajustes-fila button { padding: .4rem .7rem; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--accent-investigacion); }
+.ajustes-nueva { display: flex; gap: .5rem; margin-top: .8rem; }
+.ajustes-nueva input[type="text"] { flex: 1; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 6px; }
+.ajustes-nueva button { padding: .4rem .8rem; border-radius: 6px; border: none; background: var(--text); color: #fff; }
+```
+
+- [ ] **Step 3: Verificación manual**
+
+En la pestaña Ajustes (quitar `hidden` a mano en devtools si `app.js` aún no existe): renombrar una categoría → debe reflejarse en el Tablero. Cambiar su color → las tarjetas y el Mapa deben usar el nuevo color. Crear la etiqueta "prueba-fusión" desde una idea (panel de detalle), luego en Ajustes fusionarla con "sueño" → debe desaparecer de la lista de etiquetas y la idea debe quedarse con "sueño" en su lugar. Borrar esa idea de prueba para dejar limpios los datos de ejemplo.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add settings.js styles.css
+git commit -m "feat: ajustes de categorías y etiquetas"
+```
+
+---
