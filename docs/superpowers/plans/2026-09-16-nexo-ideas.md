@@ -538,3 +538,345 @@ git commit -m "feat: scaffold visual (HTML, CSS, PWA)"
 ```
 
 ---
+
+## Task 3: Cliente Supabase y pantalla de contraseña
+
+**Files:**
+- Create: `supabase-client.js`
+- Create: `auth-gate.js`
+- Modify: `index.html` (ya referencia estos scripts desde el Task 2, no hace falta tocarlo)
+
+**Interfaces:**
+- Consumes: `window.supabase.createClient` (global de la librería UMD cargada en `index.html`), `#gate`/`#gate-form`/`#gate-input`/`#gate-error`/`#app` (Task 2).
+- Produces: `window.NEXO_DB` (instancia del cliente Supabase, consumida por `db.js` en el Task 4) y el evento `document.dispatchEvent(new CustomEvent("nexo:unlocked"))`, disparado una vez tras contraseña correcta (o de inmediato si ya estaba desbloqueado en este navegador) — es la señal que `app.js` (Task 6) espera antes de cargar datos.
+
+- [ ] **Step 1: Write `supabase-client.js`**
+
+```js
+/* NEXO Ideas — cliente Supabase.
+   La anon key es pública por diseño (protegida por RLS, no por secreto) —
+   ver nota de seguridad en la spec. Reemplaza los dos valores de abajo con
+   los del Task 1, paso 5 (Settings → API en tu proyecto Supabase). */
+(function () {
+  "use strict";
+  var SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+  var SUPABASE_ANON_KEY = "TU-ANON-KEY";
+  window.NEXO_DB = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+})();
+```
+
+- [ ] **Step 2: Write `auth-gate.js`**
+
+```js
+/* NEXO Ideas — pantalla de contraseña.
+   Puerta de interfaz, no cifrado real (ver nota de seguridad en la spec):
+   compara el hash SHA-256 de lo escrito contra PASSWORD_HASH de abajo. */
+(function () {
+  "use strict";
+  var PASSWORD_HASH = "REEMPLAZA-ESTO-CON-TU-HASH";
+  var STORAGE_KEY = "nexo-ideas-unlocked";
+
+  function sha256Hex(text) {
+    var enc = new TextEncoder().encode(text);
+    return crypto.subtle.digest("SHA-256", enc).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+    });
+  }
+
+  function unlock() {
+    document.getElementById("gate").hidden = true;
+    document.getElementById("app").hidden = false;
+    document.dispatchEvent(new CustomEvent("nexo:unlocked"));
+  }
+
+  if (localStorage.getItem(STORAGE_KEY) === "1") {
+    unlock();
+    return;
+  }
+
+  document.getElementById("gate-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = document.getElementById("gate-input");
+    sha256Hex(input.value).then(function (hash) {
+      if (hash === PASSWORD_HASH) {
+        localStorage.setItem(STORAGE_KEY, "1");
+        unlock();
+      } else {
+        document.getElementById("gate-error").hidden = false;
+        input.value = "";
+      }
+    });
+  });
+})();
+```
+
+- [ ] **Step 3: Xavi elige una contraseña y genera su hash**
+
+En la consola del navegador (F12), con la contraseña elegida en vez de `mi-contraseña`:
+
+```js
+crypto.subtle.digest("SHA-256", new TextEncoder().encode("mi-contraseña"))
+  .then(function (b) {
+    console.log(Array.from(new Uint8Array(b)).map(function (x) { return x.toString(16).padStart(2, "0"); }).join(""));
+  });
+```
+
+Pegar el resultado en `PASSWORD_HASH` dentro de `auth-gate.js`. Para desarrollo local, vale una contraseña provisional (p.ej. `nexo-dev`) — cambiarla antes de publicar en el Task 12.
+
+- [ ] **Step 4: Pegar las credenciales del Task 1 en `supabase-client.js`**
+
+Reemplazar `SUPABASE_URL` y `SUPABASE_ANON_KEY` con los valores reales copiados en el Task 1, paso 5.
+
+- [ ] **Step 5: Verificación manual**
+
+```bash
+python3 -m http.server 4610
+```
+
+Abrir `http://localhost:4610/index.html`: escribir una contraseña incorrecta → aparece el error; escribir la correcta → la app se muestra y, recargando la página, ya no vuelve a pedir contraseña (persiste en `localStorage`). En la consola del navegador, comprobar la conexión real a Supabase:
+
+```js
+NEXO_DB.from("categorias").select("*").then(function (r) { console.log(r); });
+```
+
+Debe devolver `data` con las 5 categorías sembradas en el Task 1, sin `error`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add supabase-client.js auth-gate.js
+git commit -m "feat: cliente Supabase y pantalla de contraseña"
+```
+
+---
+
+## Task 4: Capa de datos (`db.js`) con cola offline
+
+Punto central: **cualquier** fallo de guardado (sin red o error inesperado)
+encola la operación en `localStorage` en vez de perderla — es el requisito
+central de la spec ("nunca se pierde una idea por un fallo de red"), así que
+se trata de forma uniforme sin intentar distinguir tipos de error.
+
+**Files:**
+- Create: `db.js`
+
+**Interfaces:**
+- Consumes: `window.NEXO_DB` (Task 3).
+- Produces (todo cuelga de `window.DB`, consumido por `state.js`, `capture.js`, `board.js`, `detail.js`, `map.js`, `settings.js`):
+  - `DB.listarCategorias()`, `DB.crearCategoria({nombre,color_acento,orden})`, `DB.actualizarCategoria(id,cambios)`
+  - `DB.listarIdeas()`, `DB.crearIdea({titulo,categoria_id,estado})`, `DB.actualizarIdea(id,cambios)`, `DB.borrarIdea(id)`
+  - `DB.listarNotas()`, `DB.crearNota({idea_id,contenido,fuente_titulo,fuente_autor,fuente_ref})`, `DB.borrarNota(id)`
+  - `DB.listarEtiquetas()`, `DB.crearEtiqueta(nombre)`, `DB.renombrarEtiqueta(id,nombre)`, `DB.borrarEtiqueta(id)`
+  - `DB.listarIdeaEtiquetas()`, `DB.etiquetarIdea(idea_id,etiqueta_id)`, `DB.desetiquetarIdea(idea_id,etiqueta_id)`
+  - `DB.listarNexos()`, `DB.crearNexo(idea_id_a,idea_id_b)`, `DB.borrarNexo(id)`
+  - `DB.colaPendiente()` → array de operaciones encoladas todavía sin confirmar
+  - Evento `document` `"nexo:cola-cambiada"` cada vez que la cola cambia de tamaño (para que la UI pueda mostrar "N cambios pendientes").
+  - Todas las funciones `crear*` generan el `id` (UUID) **en el cliente** antes de escribir, para que el objeto optimista devuelto en caso de fallo tenga el mismo `id` que acabará teniendo en el servidor — así no hace falta reconciliar ids después.
+
+- [ ] **Step 1: Write `db.js`**
+
+```js
+/* NEXO Ideas — capa de acceso a datos sobre Supabase, con cola offline.
+   Cualquier fallo de escritura (sin red o error inesperado) se encola en
+   localStorage y se reintenta solo — nunca se pierde una idea por un fallo
+   de red, que es el caso de uso central (capturar en la calle). */
+(function () {
+  "use strict";
+
+  var SB = window.NEXO_DB;
+  var COLA_KEY = "nexo-ideas-cola";
+
+  function uuid() {
+    return crypto.randomUUID();
+  }
+
+  function leerCola() {
+    try { return JSON.parse(localStorage.getItem(COLA_KEY)) || []; }
+    catch (e) { return []; }
+  }
+
+  function guardarCola(cola) {
+    localStorage.setItem(COLA_KEY, JSON.stringify(cola));
+    document.dispatchEvent(new CustomEvent("nexo:cola-cambiada", { detail: { pendientes: cola.length } }));
+  }
+
+  function encolar(op) {
+    var cola = leerCola();
+    cola.push(op);
+    guardarCola(cola);
+  }
+
+  async function ejecutarOp(op) {
+    if (op.operacion === "insert") {
+      var r1 = await SB.from(op.tabla).insert(op.payload);
+      if (r1.error) throw r1.error;
+    } else if (op.operacion === "update") {
+      var r2 = await SB.from(op.tabla).update(op.cambios).eq("id", op.id);
+      if (r2.error) throw r2.error;
+    } else if (op.operacion === "delete") {
+      var r3 = await SB.from(op.tabla).delete().eq("id", op.id);
+      if (r3.error) throw r3.error;
+    }
+  }
+
+  async function procesarCola() {
+    var cola = leerCola();
+    while (cola.length) {
+      try {
+        await ejecutarOp(cola[0]);
+        cola.shift();
+        guardarCola(cola);
+      } catch (e) {
+        break; // seguimos con red mala; se reintenta en el próximo trigger
+      }
+    }
+  }
+
+  window.addEventListener("online", procesarCola);
+  setInterval(procesarCola, 30000);
+
+  // intenta escribir ya; si falla (red u otro error), encola y sigue
+  // adelante de forma optimista con el mismo id que se generó en el cliente
+  async function escribirConCola(tabla, operacion, payload, idParaCola, cambiosParaCola) {
+    try {
+      await ejecutarOp({ tabla: tabla, operacion: operacion, payload: payload, id: idParaCola, cambios: cambiosParaCola });
+      return { pendiente: false };
+    } catch (e) {
+      encolar({ tabla: tabla, operacion: operacion, payload: payload, id: idParaCola, cambios: cambiosParaCola });
+      return { pendiente: true };
+    }
+  }
+
+  var DB = {};
+
+  // ---- categorias ----
+  DB.listarCategorias = async function () {
+    var r = await SB.from("categorias").select("*").order("orden");
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.crearCategoria = async function (datos) {
+    var fila = Object.assign({ id: uuid() }, datos);
+    var estado = await escribirConCola("categorias", "insert", fila);
+    return Object.assign({}, fila, { _pendiente: estado.pendiente });
+  };
+  DB.actualizarCategoria = async function (id, cambios) {
+    var estado = await escribirConCola("categorias", "update", null, id, cambios);
+    return Object.assign({ id: id }, cambios, { _pendiente: estado.pendiente });
+  };
+
+  // ---- ideas ----
+  DB.listarIdeas = async function () {
+    var r = await SB.from("ideas").select("*").order("created_at", { ascending: false });
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.crearIdea = async function (datos) {
+    var fila = Object.assign({ id: uuid(), estado: "suelta" }, datos);
+    var estado = await escribirConCola("ideas", "insert", fila);
+    return Object.assign({}, fila, { _pendiente: estado.pendiente });
+  };
+  DB.actualizarIdea = async function (id, cambios) {
+    var estado = await escribirConCola("ideas", "update", null, id, cambios);
+    return Object.assign({ id: id }, cambios, { _pendiente: estado.pendiente });
+  };
+  DB.borrarIdea = async function (id) {
+    await escribirConCola("ideas", "delete", null, id);
+  };
+
+  // ---- notas ----
+  DB.listarNotas = async function () {
+    var r = await SB.from("notas").select("*").order("created_at");
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.crearNota = async function (datos) {
+    var fila = Object.assign({ id: uuid() }, datos);
+    var estado = await escribirConCola("notas", "insert", fila);
+    return Object.assign({}, fila, { _pendiente: estado.pendiente });
+  };
+  DB.borrarNota = async function (id) {
+    await escribirConCola("notas", "delete", null, id);
+  };
+
+  // ---- etiquetas ----
+  DB.listarEtiquetas = async function () {
+    var r = await SB.from("etiquetas").select("*").order("nombre");
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.crearEtiqueta = async function (nombre) {
+    var fila = { id: uuid(), nombre: nombre };
+    var estado = await escribirConCola("etiquetas", "insert", fila);
+    return Object.assign({}, fila, { _pendiente: estado.pendiente });
+  };
+  DB.renombrarEtiqueta = async function (id, nombre) {
+    await escribirConCola("etiquetas", "update", null, id, { nombre: nombre });
+  };
+  DB.borrarEtiqueta = async function (id) {
+    await escribirConCola("etiquetas", "delete", null, id);
+  };
+
+  // ---- idea_etiquetas ----
+  DB.listarIdeaEtiquetas = async function () {
+    var r = await SB.from("idea_etiquetas").select("*");
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.etiquetarIdea = async function (ideaId, etiquetaId) {
+    var fila = { idea_id: ideaId, etiqueta_id: etiquetaId };
+    await escribirConCola("idea_etiquetas", "insert", fila);
+  };
+  DB.desetiquetarIdea = async function (ideaId, etiquetaId) {
+    try {
+      var r = await SB.from("idea_etiquetas").delete().eq("idea_id", ideaId).eq("etiqueta_id", etiquetaId);
+      if (r.error) throw r.error;
+    } catch (e) {
+      // caso raro offline: no hay id propio para encolar un delete por pk compuesta,
+      // así que se resuelve al vuelo en el próximo intento de listarIdeaEtiquetas()
+    }
+  };
+
+  // ---- nexos ----
+  DB.listarNexos = async function () {
+    var r = await SB.from("nexos").select("*");
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.crearNexo = async function (ideaIdA, ideaIdB) {
+    var fila = { id: uuid(), idea_id_a: ideaIdA, idea_id_b: ideaIdB };
+    var estado = await escribirConCola("nexos", "insert", fila);
+    return Object.assign({}, fila, { _pendiente: estado.pendiente });
+  };
+  DB.borrarNexo = async function (id) {
+    await escribirConCola("nexos", "delete", null, id);
+  };
+
+  DB.colaPendiente = function () { return leerCola(); };
+
+  window.DB = DB;
+})();
+```
+
+- [ ] **Step 2: Verificación manual**
+
+Con el servidor local corriendo y ya desbloqueada la app, en la consola del navegador:
+
+```js
+DB.crearIdea({ titulo: "Prueba desde consola", categoria_id: (await DB.listarCategorias())[0].id })
+  .then(function (idea) { console.log(idea); return DB.listarIdeas(); })
+  .then(function (ideas) { console.log(ideas.length, "ideas"); });
+```
+
+Confirmar que aparece la nueva fila en el `Table Editor` de Supabase. Luego, con las herramientas de red del navegador puestas en "Offline": repetir `DB.crearIdea(...)`, comprobar que la promesa se resuelve igualmente (con `_pendiente: true`) y que `DB.colaPendiente().length` es `1`; volver a poner la red "Online" y comprobar (esperando unos segundos, o disparando manualmente `window.dispatchEvent(new Event("online"))`) que `DB.colaPendiente().length` vuelve a `0` y la fila aparece en Supabase.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add db.js
+git commit -m "feat: capa de datos con cola offline"
+```
+
+---
