@@ -106,6 +106,8 @@
       var nombre = etqInput.value.trim().toLowerCase();
       if (!nombre) return;
       var etiqueta = await etiquetaPorNombreOCrear(nombre);
+      var yaTiene = STATE.etiquetasDeIdea(idea.id).some(function (t) { return t.id === etiqueta.id; });
+      if (yaTiene) { etqInput.value = ""; return; }
       await DB.etiquetarIdea(idea.id, etiqueta.id);
       STATE.ideaEtiquetas.push({ idea_id: idea.id, etiqueta_id: etiqueta.id });
       etqInput.value = "";
