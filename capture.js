@@ -9,6 +9,7 @@
   var categoriasBox = document.getElementById("captura-categorias");
   var etiquetasInput = document.getElementById("captura-etiquetas");
   var cancelarBtn = document.getElementById("captura-cancelar");
+  var guardarBtn = form.querySelector('button[type="submit"]');
   var categoriaSeleccionada = null;
 
   function renderChipsCategoria() {
@@ -61,19 +62,28 @@
     var titulo = tituloInput.value.trim();
     if (!titulo || !categoriaSeleccionada) return;
 
-    var idea = await DB.crearIdea({ titulo: titulo, categoria_id: categoriaSeleccionada });
-    STATE.ideas.unshift(idea);
+    // hay varios await por delante: sin esto, un doble toque rápido en
+    // "Guardar" crea la idea dos veces
+    if (guardarBtn.disabled) return;
+    guardarBtn.disabled = true;
 
-    var nombres = etiquetasInput.value.split(",")
-      .map(function (s) { return s.trim().toLowerCase(); })
-      .filter(Boolean);
-    for (var i = 0; i < nombres.length; i++) {
-      var etiqueta = await etiquetaPorNombreOCrear(nombres[i]);
-      await DB.etiquetarIdea(idea.id, etiqueta.id);
-      STATE.ideaEtiquetas.push({ idea_id: idea.id, etiqueta_id: etiqueta.id });
+    try {
+      var idea = await DB.crearIdea({ titulo: titulo, categoria_id: categoriaSeleccionada });
+      STATE.ideas.unshift(idea);
+
+      var nombres = etiquetasInput.value.split(",")
+        .map(function (s) { return s.trim().toLowerCase(); })
+        .filter(Boolean);
+      for (var i = 0; i < nombres.length; i++) {
+        var etiqueta = await etiquetaPorNombreOCrear(nombres[i]);
+        await DB.etiquetarIdea(idea.id, etiqueta.id);
+        STATE.ideaEtiquetas.push({ idea_id: idea.id, etiqueta_id: etiqueta.id });
+      }
+
+      STATE.notificar();
+      cerrar();
+    } finally {
+      guardarBtn.disabled = false;
     }
-
-    STATE.notificar();
-    cerrar();
   });
 })();
