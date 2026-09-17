@@ -6,10 +6,27 @@
 
   var listeners = [];
   var listo = false;
+  var CATEGORIAS_CACHE_KEY = "nexo-ideas-categorias-cache";
 
   var STATE = {
     categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: []
   };
+
+  // Solo las categorías: en un arranque en frío sin red, capture.js no puede
+  // pintar sus chips sin ellas y el formulario queda inservible — que es
+  // justo el caso de uso que la app existe para cubrir.
+  function guardarCacheCategorias() {
+    try { localStorage.setItem(CATEGORIAS_CACHE_KEY, JSON.stringify(STATE.categorias)); }
+    catch (e) { /* cuota llena o modo privado: la app sigue funcionando online */ }
+  }
+
+  function sembrarCacheCategorias() {
+    if (STATE.categorias.length) return;
+    try {
+      var guardadas = JSON.parse(localStorage.getItem(CATEGORIAS_CACHE_KEY));
+      if (guardadas && guardadas.length) { STATE.categorias = guardadas; notificar(); }
+    } catch (e) { /* caché corrupta: se ignora */ }
+  }
 
   function notificar() {
     listeners.forEach(function (fn) { fn(); });
@@ -28,12 +45,13 @@
     ]);
     STATE.categorias = r[0]; STATE.ideas = r[1]; STATE.notas = r[2];
     STATE.etiquetas = r[3]; STATE.ideaEtiquetas = r[4]; STATE.nexos = r[5];
+    guardarCacheCategorias();
     notificar();
     if (!listo) { listo = true; document.dispatchEvent(new CustomEvent("nexo:estado-listo")); }
   };
 
   var RECARGA = {
-    categorias: function () { return DB.listarCategorias().then(function (d) { STATE.categorias = d; }); },
+    categorias: function () { return DB.listarCategorias().then(function (d) { STATE.categorias = d; guardarCacheCategorias(); }); },
     ideas: function () { return DB.listarIdeas().then(function (d) { STATE.ideas = d; }); },
     notas: function () { return DB.listarNotas().then(function (d) { STATE.notas = d; }); },
     etiquetas: function () { return DB.listarEtiquetas().then(function (d) { STATE.etiquetas = d; }); },
@@ -72,6 +90,7 @@
   };
 
   document.addEventListener("nexo:unlocked", function () {
+    sembrarCacheCategorias();
     STATE.cargarTodo();
     suscribirTiempoReal();
   });

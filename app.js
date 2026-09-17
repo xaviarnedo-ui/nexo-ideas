@@ -21,4 +21,12 @@
   });
 
   activar("tablero");
+
+  // Sin esto el sw.js nunca se instala y capturar sin cobertura —el motivo
+  // de existir de la app— no funciona en frío.
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(function (e) {
+      console.error("No se pudo registrar el service worker", e);
+    });
+  }
 })();
