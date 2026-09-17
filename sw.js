@@ -1,25 +1,25 @@
-var CACHE = "nexo-ideas-v4";
+var CACHE = "nexo-ideas-v5";
 // Todo el esqueleto de la app: si falta un solo .js, offline no arranca.
 // Mantener en sync con los <script> de index.html (incluido el ?v=N).
 var ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=4",
+  "./styles.css?v=5",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./supabase-js.min.js?v=4",
-  "./supabase-client.js?v=4",
-  "./db.js?v=4",
-  "./state.js?v=4",
-  "./auth-gate.js?v=4",
-  "./capture.js?v=4",
-  "./board.js?v=4",
-  "./detail.js?v=4",
-  "./map.js?v=4",
-  "./mensajes.js?v=4",
-  "./settings.js?v=4",
-  "./app.js?v=4"
+  "./supabase-js.min.js?v=5",
+  "./supabase-client.js?v=5",
+  "./db.js?v=5",
+  "./state.js?v=5",
+  "./auth-gate.js?v=5",
+  "./capture.js?v=5",
+  "./board.js?v=5",
+  "./detail.js?v=5",
+  "./map.js?v=5",
+  "./mensajes.js?v=5",
+  "./settings.js?v=5",
+  "./app.js?v=5"
 ];
 
 self.addEventListener("install", function (e) {

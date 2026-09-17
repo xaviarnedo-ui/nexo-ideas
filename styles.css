@@ -150,6 +150,14 @@ input, textarea, select { font-family: var(--font-body); font-size: 1rem; }
 
 /* ---- Panel de detalle ---- */
 .panel { display: flex; flex-direction: column; gap: .3rem; }
+/* El panel es más alto que la pantalla (por diseño: se hace scroll dentro
+   de él). Sin esto, al ser una columna flex más alta que su contenedor,
+   los controles nativos (input/select/textarea, que el navegador les pone
+   overflow propio) pierden su "alto mínimo automático" y el algoritmo de
+   flex-shrink los aplasta para intentar que quepa todo entero — el título,
+   los desplegables y el cuadro de texto salían chafados; los divs
+   normales (notas, etiquetas) no, porque esos sí conservan ese mínimo. */
+.panel > * { flex-shrink: 0; }
 .panel-cerrar { border: none; background: transparent; font-size: 1.1rem; align-self: flex-end; color: var(--text-muted); }
 .panel-titulo { font-family: var(--font-title); font-size: 1.3rem; font-weight: 600; border: none; border-bottom: 1px solid var(--border); padding: .3rem 0; margin-bottom: .6rem; width: 100%; }
 .panel select, .panel textarea { width: 100%; padding: .5rem .6rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: .6rem; }
