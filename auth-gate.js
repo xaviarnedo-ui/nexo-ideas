@@ -3,7 +3,7 @@
    compara el hash SHA-256 de lo escrito contra PASSWORD_HASH de abajo. */
 (function () {
   "use strict";
-  var PASSWORD_HASH = "REEMPLAZA-ESTO-CON-TU-HASH";
+  var PASSWORD_HASH = "c5ffba48378c429918ef653cf955a55a145d46092804482a9e2a3bb42215dc2e";
   var STORAGE_KEY = "nexo-ideas-unlocked";
 
   function sha256Hex(text) {
