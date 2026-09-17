@@ -9,7 +9,7 @@
   var CATEGORIAS_CACHE_KEY = "nexo-ideas-categorias-cache";
 
   var STATE = {
-    categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: []
+    categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: [], fotos: []
   };
 
   // Solo las categorías: en un arranque en frío sin red, capture.js no puede
@@ -84,6 +84,11 @@
     ]);
     STATE.categorias = r[0]; STATE.ideas = r[1]; STATE.notas = r[2];
     STATE.etiquetas = r[3]; STATE.ideaEtiquetas = r[4]; STATE.nexos = r[5];
+    // Aparte y sin bloquear lo de arriba: fotos es la tabla más nueva, y si
+    // todavía no existe (falta ejecutar supabase/fotos.sql) no debe tirar
+    // abajo la carga de categorías/ideas/notas, que sí son imprescindibles.
+    try { STATE.fotos = await DB.listarFotos(); }
+    catch (e) { console.error("No se pudieron cargar las fotos (¿falta supabase/fotos.sql?)", e); }
     guardarCacheCategorias();
     fusionarIdeasEnCola();
     ocultarErrorDeCarga();
@@ -97,7 +102,8 @@
     notas: function () { return DB.listarNotas().then(function (d) { STATE.notas = d; }); },
     etiquetas: function () { return DB.listarEtiquetas().then(function (d) { STATE.etiquetas = d; }); },
     idea_etiquetas: function () { return DB.listarIdeaEtiquetas().then(function (d) { STATE.ideaEtiquetas = d; }); },
-    nexos: function () { return DB.listarNexos().then(function (d) { STATE.nexos = d; }); }
+    nexos: function () { return DB.listarNexos().then(function (d) { STATE.nexos = d; }); },
+    fotos: function () { return DB.listarFotos().then(function (d) { STATE.fotos = d; }); }
   };
 
   function suscribirTiempoReal() {
@@ -128,6 +134,9 @@
       .filter(function (n) { return n.idea_id_a === ideaId || n.idea_id_b === ideaId; })
       .map(function (n) { return STATE.ideaPorId(n.idea_id_a === ideaId ? n.idea_id_b : n.idea_id_a); })
       .filter(Boolean);
+  };
+  STATE.fotosDeIdea = function (ideaId) {
+    return STATE.fotos.filter(function (f) { return f.idea_id === ideaId; });
   };
 
   document.addEventListener("nexo:unlocked", function () {

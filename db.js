@@ -232,5 +232,32 @@
   // en silencio, quedan aquí para poder mirar qué falló y por qué
   DB.colaFallida = function () { return leerColaFallida(); };
 
+  // ---- fotos ----
+  // La subida en sí (el binario) no pasa por la cola offline — un archivo
+  // de imagen no cabe razonablemente en localStorage. Si falla, se avisa
+  // y hay que reintentar con conexión. La fila de metadatos (fotos) sí usa
+  // la cola normal, igual que el resto de escrituras.
+  DB.listarFotos = async function () {
+    var r = await SB.from("fotos").select("*").order("created_at");
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.urlFoto = function (storagePath) {
+    return SB.storage.from("fotos").getPublicUrl(storagePath).data.publicUrl;
+  };
+  DB.subirFoto = async function (ideaId, blob) {
+    var id = uuid();
+    var path = ideaId + "/" + id + ".jpg";
+    var subida = await SB.storage.from("fotos").upload(path, blob, { contentType: "image/jpeg" });
+    if (subida.error) throw subida.error;
+    var fila = { id: id, idea_id: ideaId, storage_path: path };
+    var estado = await escribirConCola("fotos", "insert", fila);
+    return Object.assign({}, fila, { _pendiente: estado.pendiente });
+  };
+  DB.borrarFoto = async function (id, storagePath) {
+    await SB.storage.from("fotos").remove([storagePath]);
+    await escribirConCola("fotos", "delete", null, id);
+  };
+
   window.DB = DB;
 })();

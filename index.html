@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,500&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -62,20 +62,20 @@
 <!-- supabase-js va servido en local (no desde unpkg): el service worker no
      puede cachear respuestas opacas de otro origen, y sin esta librería
      offline fallaría supabase-client.js y con él toda la app. -->
-<script src="supabase-js.min.js?v=2"></script>
-<script src="supabase-client.js?v=2"></script>
+<script src="supabase-js.min.js?v=3"></script>
+<script src="supabase-client.js?v=3"></script>
 <!-- state.js debe cargar ANTES que auth-gate.js: en una visita de vuelta
      auth-gate.js desbloquea y lanza "nexo:unlocked" al cargarse, y si
      state.js aún no ha registrado su listener el evento se pierde y la app
      se queda vacía para siempre. -->
-<script src="db.js?v=2"></script>
-<script src="state.js?v=2"></script>
-<script src="auth-gate.js?v=2"></script>
-<script src="capture.js?v=2"></script>
-<script src="board.js?v=2"></script>
-<script src="detail.js?v=2"></script>
-<script src="map.js?v=2"></script>
-<script src="settings.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="db.js?v=3"></script>
+<script src="state.js?v=3"></script>
+<script src="auth-gate.js?v=3"></script>
+<script src="capture.js?v=3"></script>
+<script src="board.js?v=3"></script>
+<script src="detail.js?v=3"></script>
+<script src="map.js?v=3"></script>
+<script src="settings.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

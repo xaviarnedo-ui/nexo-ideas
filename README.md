@@ -11,7 +11,9 @@ instante. Ver el diseño completo en
 ## Primer arranque
 
 1. Crear el proyecto en [supabase.com](https://supabase.com) y ejecutar
-   `supabase/schema.sql` y `supabase/seed.sql` en el SQL Editor.
+   `supabase/schema.sql`, `supabase/seed.sql` y `supabase/fotos.sql` en el
+   SQL Editor (este último crea el almacén de imágenes para adjuntar fotos
+   a una idea).
 2. Pegar `SUPABASE_URL` y la `anon key` (Settings → API) en
    `supabase-client.js`.
 3. Elegir una contraseña, calcular su hash SHA-256 (instrucciones en
@@ -60,6 +62,6 @@ para quitarle una etiqueta a una idea está `desetiquetar`.
 | `map.js` | Vista Mapa (grafo radial en SVG) |
 | `settings.js` | Ajustes de categorías y etiquetas |
 | `app.js` | Arranque y navegación entre pestañas |
-| `supabase/schema.sql`, `supabase/seed.sql` | Esquema y datos de ejemplo (se ejecutan a mano en Supabase) |
+| `supabase/schema.sql`, `supabase/seed.sql`, `supabase/fotos.sql` | Esquema, datos de ejemplo y almacén de fotos (se ejecutan a mano en Supabase) |
 | `nexo_cli.py`, `.env.example` | Acceso de Claude a los datos desde la terminal |
 | `manifest.json`, `sw.js`, `icons/`, `gen_icons.py` | PWA |

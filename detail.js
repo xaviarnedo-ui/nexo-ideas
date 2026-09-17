@@ -19,6 +19,34 @@
     return creada;
   }
 
+  // Reduce la foto a un lado máximo de 1600px y la reempaqueta en JPEG
+  // antes de subirla — una foto de móvil sin tocar pesa varios MB, lento
+  // y caro en datos móviles para lo que hace falta (leer una etiqueta o
+  // una página de un libro).
+  function redimensionarImagen(file) {
+    return new Promise(function (resolve, reject) {
+      var LADO_MAXIMO = 1600;
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.width, h = img.height;
+        if (w > LADO_MAXIMO || h > LADO_MAXIMO) {
+          if (w > h) { h = Math.round(h * LADO_MAXIMO / w); w = LADO_MAXIMO; }
+          else { w = Math.round(w * LADO_MAXIMO / h); h = LADO_MAXIMO; }
+        }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob); else reject(new Error("No se pudo procesar la imagen"));
+        }, "image/jpeg", 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("No se pudo leer la imagen")); };
+      img.src = url;
+    });
+  }
+
   // El panel se repinta entero ante cualquier cambio de STATE, venga o no
   // de la idea abierta. Si llega un cambio de Realtime mientras se está
   // escribiendo (el guardado ocurre al blur), la reconstrucción se llevaría
@@ -179,6 +207,51 @@
     });
     notasSeccion.appendChild(notaForm);
     panel.appendChild(notasSeccion);
+
+    // ---- Fotos ----
+    var fotosSeccion = document.createElement("div"); fotosSeccion.className = "panel-seccion";
+    var fotosTitulo = document.createElement("h3"); fotosTitulo.textContent = "Fotos"; fotosSeccion.appendChild(fotosTitulo);
+    var fotosGrid = document.createElement("div"); fotosGrid.className = "fotos-grid";
+    STATE.fotosDeIdea(idea.id).forEach(function (foto) {
+      var item = document.createElement("div"); item.className = "foto-item";
+      var img = document.createElement("img");
+      img.src = DB.urlFoto(foto.storage_path);
+      img.alt = "";
+      item.appendChild(img);
+      var borrarFotoBtn = document.createElement("button");
+      borrarFotoBtn.type = "button"; borrarFotoBtn.className = "foto-borrar"; borrarFotoBtn.textContent = "✕";
+      borrarFotoBtn.addEventListener("click", async function () {
+        if (!confirm("¿Borrar esta foto?")) return;
+        await DB.borrarFoto(foto.id, foto.storage_path);
+        STATE.fotos = STATE.fotos.filter(function (f) { return f.id !== foto.id; });
+        STATE.notificar();
+      });
+      item.appendChild(borrarFotoBtn);
+      fotosGrid.appendChild(item);
+    });
+    fotosSeccion.appendChild(fotosGrid);
+
+    var fotoEstado = document.createElement("p"); fotoEstado.className = "foto-estado"; fotoEstado.hidden = true;
+    var fotoInput = document.createElement("input");
+    fotoInput.type = "file"; fotoInput.accept = "image/*"; fotoInput.className = "foto-input";
+    fotoInput.addEventListener("change", async function () {
+      var file = fotoInput.files[0];
+      if (!file) return;
+      fotoEstado.hidden = false; fotoEstado.textContent = "Subiendo foto...";
+      try {
+        var blob = await redimensionarImagen(file);
+        var foto = await DB.subirFoto(idea.id, blob);
+        STATE.fotos.push(foto);
+        fotoInput.value = "";
+        fotoEstado.hidden = true;
+        STATE.notificar();
+      } catch (e) {
+        fotoEstado.textContent = "No se pudo subir la foto. Comprueba tu conexión e inténtalo de nuevo.";
+      }
+    });
+    fotosSeccion.appendChild(fotoInput);
+    fotosSeccion.appendChild(fotoEstado);
+    panel.appendChild(fotosSeccion);
 
     // ---- Nexos ----
     var nexosSeccion = document.createElement("div"); nexosSeccion.className = "panel-seccion";
