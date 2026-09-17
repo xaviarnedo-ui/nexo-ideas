@@ -10,7 +10,42 @@
   var etiquetasInput = document.getElementById("captura-etiquetas");
   var cancelarBtn = document.getElementById("captura-cancelar");
   var guardarBtn = form.querySelector('button[type="submit"]');
+  var fotoInput = document.getElementById("captura-foto");
+  var fotoEstado = document.getElementById("captura-foto-estado");
   var categoriaSeleccionada = null;
+
+  // Duplicado a propósito de detail.js (mismo criterio ya usado con
+  // etiquetaPorNombreOCrear): son dos módulos independientes, y esto es
+  // más simple que montar un archivo de utilidades compartidas para una
+  // sola función.
+  function redimensionarImagen(file) {
+    return new Promise(function (resolve, reject) {
+      var LADO_MAXIMO = 1600;
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.width, h = img.height;
+        if (w > LADO_MAXIMO || h > LADO_MAXIMO) {
+          if (w > h) { h = Math.round(h * LADO_MAXIMO / w); w = LADO_MAXIMO; }
+          else { w = Math.round(w * LADO_MAXIMO / h); h = LADO_MAXIMO; }
+        }
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob); else reject(new Error("No se pudo procesar la imagen"));
+        }, "image/jpeg", 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("No se pudo leer la imagen")); };
+      img.src = url;
+    });
+  }
+
+  function tituloFotoPorDefecto() {
+    var fecha = new Date().toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    return "Foto " + fecha;
+  }
 
   function renderChipsCategoria() {
     categoriasBox.innerHTML = "";
@@ -37,6 +72,8 @@
     categoriaSeleccionada = null;
     tituloInput.value = "";
     etiquetasInput.value = "";
+    fotoInput.value = "";
+    fotoEstado.hidden = true;
     renderChipsCategoria();
     modal.hidden = false;
     tituloInput.focus();
@@ -56,6 +93,31 @@
 
   fab.addEventListener("click", abrir);
   cancelarBtn.addEventListener("click", cerrar);
+
+  // Captura mínima: una foto sola, sin pasar por título/categoría. Crea una
+  // idea con un título por defecto (fecha/hora) en la primera categoría, y
+  // le cuelga la foto — se renombra y recategoriza luego desde el detalle,
+  // igual que cualquier otra idea suelta.
+  fotoInput.addEventListener("change", async function () {
+    var file = fotoInput.files[0];
+    if (!file || !STATE.categorias.length) return;
+    fotoInput.disabled = true;
+    fotoEstado.hidden = false;
+    fotoEstado.textContent = "Guardando foto...";
+    try {
+      var blob = await redimensionarImagen(file);
+      var idea = await DB.crearIdea({ titulo: tituloFotoPorDefecto(), categoria_id: STATE.categorias[0].id });
+      STATE.ideas.unshift(idea);
+      var foto = await DB.subirFoto(idea.id, blob);
+      STATE.fotos.push(foto);
+      STATE.notificar();
+      cerrar();
+    } catch (e) {
+      fotoEstado.textContent = "No se pudo guardar la foto. Comprueba tu conexión e inténtalo de nuevo.";
+    } finally {
+      fotoInput.disabled = false;
+    }
+  });
 
   form.addEventListener("submit", async function (e) {
     e.preventDefault();

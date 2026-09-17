@@ -105,6 +105,14 @@ input, textarea, select { font-family: var(--font-body); font-size: 1rem; }
 .modal-actions button { padding: .5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: transparent; }
 .modal-actions button[type="submit"] { background: var(--text); color: #fff; border-color: var(--text); }
 
+/* ---- Foto rápida (dentro del modal de captura) ---- */
+.captura-foto-rapida { margin: -.2rem 0 .1rem; }
+.captura-foto-btn {
+  display: inline-block; padding: .45rem .8rem; border: 1px dashed var(--border); border-radius: 8px;
+  font-size: .85rem; color: var(--text-muted); cursor: pointer;
+}
+.captura-foto-estado { font-size: .8rem; color: var(--text-muted); margin: .3rem 0 0; }
+
 /* ---- Chips (categorías/etiquetas) ---- */
 .chip-group { display: flex; flex-wrap: wrap; gap: .4rem; }
 .chip {
