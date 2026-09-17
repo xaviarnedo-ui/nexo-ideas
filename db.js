@@ -259,5 +259,20 @@
     await escribirConCola("fotos", "delete", null, id);
   };
 
+  // ---- mensajes ----
+  // Canal para pedirle algo a Claude (no para guardar conocimiento, eso son
+  // las ideas). Claude los revisa cuando Xavi se lo pide en una sesión, no
+  // automáticamente.
+  DB.listarMensajes = async function () {
+    var r = await SB.from("mensajes").select("*").order("created_at", { ascending: false });
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.crearMensaje = async function (contenido) {
+    var fila = { id: uuid(), contenido: contenido };
+    var estado = await escribirConCola("mensajes", "insert", fila);
+    return Object.assign({}, fila, { estado: "pendiente", _pendiente: estado.pendiente });
+  };
+
   window.DB = DB;
 })();

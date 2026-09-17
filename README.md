@@ -11,9 +11,10 @@ instante. Ver el diseño completo en
 ## Primer arranque
 
 1. Crear el proyecto en [supabase.com](https://supabase.com) y ejecutar
-   `supabase/schema.sql`, `supabase/seed.sql` y `supabase/fotos.sql` en el
-   SQL Editor (este último crea el almacén de imágenes para adjuntar fotos
-   a una idea).
+   `supabase/schema.sql`, `supabase/seed.sql`, `supabase/fotos.sql` y
+   `supabase/mensajes.sql` en el SQL Editor (fotos = almacén de imágenes
+   para adjuntar fotos a una idea; mensajes = la pestaña "Mensajes" para
+   pedirle algo a Claude).
 2. Pegar `SUPABASE_URL` y la `anon key` (Settings → API) en
    `supabase-client.js`.
 3. Elegir una contraseña, calcular su hash SHA-256 (instrucciones en
@@ -46,6 +47,15 @@ python3 nexo_cli.py desetiquetar <idea_id> <etiqueta_id>
 `idea_etiquetas`, que usa la clave compuesta (`idea_id`, `etiqueta_id`):
 para quitarle una etiqueta a una idea está `desetiquetar`.
 
+**Pestaña "Mensajes":** Xavi le pide cosas a Claude desde la propia app
+(tabla `mensajes`). No hay procesamiento automático — cuando Xavi diga
+"revisa mis mensajes" en una sesión de Claude Code:
+
+```bash
+python3 nexo_cli.py listar mensajes
+python3 nexo_cli.py actualizar mensajes <id> '{"estado":"hecho", "respuesta":"..."}'
+```
+
 ## Estructura de archivos
 
 | Archivo | Qué es |
@@ -60,8 +70,9 @@ para quitarle una etiqueta a una idea está `desetiquetar`.
 | `board.js` | Vista Tablero (búsqueda, filtro por etiqueta) |
 | `detail.js` | Panel de detalle (editar, notas, nexos) |
 | `map.js` | Vista Mapa (grafo radial en SVG) |
+| `mensajes.js` | Vista Mensajes (peticiones de Xavi a Claude) |
 | `settings.js` | Ajustes de categorías y etiquetas |
 | `app.js` | Arranque y navegación entre pestañas |
-| `supabase/schema.sql`, `supabase/seed.sql`, `supabase/fotos.sql` | Esquema, datos de ejemplo y almacén de fotos (se ejecutan a mano en Supabase) |
+| `supabase/schema.sql`, `supabase/seed.sql`, `supabase/fotos.sql`, `supabase/mensajes.sql` | Esquema, datos de ejemplo, almacén de fotos y tabla de mensajes (se ejecutan a mano en Supabase) |
 | `nexo_cli.py`, `.env.example` | Acceso de Claude a los datos desde la terminal |
 | `manifest.json`, `sw.js`, `icons/`, `gen_icons.py` | PWA |

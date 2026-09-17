@@ -9,7 +9,7 @@
   var CATEGORIAS_CACHE_KEY = "nexo-ideas-categorias-cache";
 
   var STATE = {
-    categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: [], fotos: []
+    categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: [], fotos: [], mensajes: []
   };
 
   // Solo las categorías: en un arranque en frío sin red, capture.js no puede
@@ -84,11 +84,13 @@
     ]);
     STATE.categorias = r[0]; STATE.ideas = r[1]; STATE.notas = r[2];
     STATE.etiquetas = r[3]; STATE.ideaEtiquetas = r[4]; STATE.nexos = r[5];
-    // Aparte y sin bloquear lo de arriba: fotos es la tabla más nueva, y si
-    // todavía no existe (falta ejecutar supabase/fotos.sql) no debe tirar
-    // abajo la carga de categorías/ideas/notas, que sí son imprescindibles.
+    // Aparte y sin bloquear lo de arriba: fotos y mensajes son las tablas
+    // más nuevas, y si todavía no existen (falta ejecutar su .sql) no deben
+    // tirar abajo la carga de categorías/ideas/notas, que sí son imprescindibles.
     try { STATE.fotos = await DB.listarFotos(); }
     catch (e) { console.error("No se pudieron cargar las fotos (¿falta supabase/fotos.sql?)", e); }
+    try { STATE.mensajes = await DB.listarMensajes(); }
+    catch (e) { console.error("No se pudieron cargar los mensajes (¿falta supabase/mensajes.sql?)", e); }
     guardarCacheCategorias();
     fusionarIdeasEnCola();
     ocultarErrorDeCarga();
@@ -103,7 +105,8 @@
     etiquetas: function () { return DB.listarEtiquetas().then(function (d) { STATE.etiquetas = d; }); },
     idea_etiquetas: function () { return DB.listarIdeaEtiquetas().then(function (d) { STATE.ideaEtiquetas = d; }); },
     nexos: function () { return DB.listarNexos().then(function (d) { STATE.nexos = d; }); },
-    fotos: function () { return DB.listarFotos().then(function (d) { STATE.fotos = d; }); }
+    fotos: function () { return DB.listarFotos().then(function (d) { STATE.fotos = d; }); },
+    mensajes: function () { return DB.listarMensajes().then(function (d) { STATE.mensajes = d; }); }
   };
 
   function suscribirTiempoReal() {
