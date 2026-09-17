@@ -1,5 +1,7 @@
 # NEXO Ideas
 
+**En producción: https://xaviarnedo-ui.github.io/nexo-ideas/**
+
 Espacio personal de Xavi para capturar, organizar y conectar las ideas de
 su consulta de PNI. PWA (HTML+CSS+JS, sin build tools) con Supabase como
 base de datos real — se escribe y se lee desde cualquier dispositivo al
