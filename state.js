@@ -28,6 +28,21 @@
     } catch (e) { /* caché corrupta: se ignora */ }
   }
 
+  // Una idea creada sin red vive solo en la cola de db.js. Al recargar,
+  // cargarTodo() sustituye STATE.ideas por lo que hay en el servidor y la
+  // idea desaparecería del tablero aunque siga a salvo en localStorage.
+  // Los ids se generan en el cliente, así que el mismo id está en la cola y
+  // en STATE.ideas si se creó en esta misma sesión: se deduplica por id.
+  function fusionarIdeasEnCola() {
+    DB.colaPendiente().forEach(function (op) {
+      if (op.tabla !== "ideas" || op.operacion !== "insert") return;
+      if (!op.payload || !op.payload.id) return;
+      var yaEsta = STATE.ideas.some(function (i) { return i.id === op.payload.id; });
+      if (yaEsta) return;
+      STATE.ideas.unshift(Object.assign({}, op.payload, { _pendiente: true }));
+    });
+  }
+
   function notificar() {
     listeners.forEach(function (fn) { fn(); });
   }
@@ -46,13 +61,14 @@
     STATE.categorias = r[0]; STATE.ideas = r[1]; STATE.notas = r[2];
     STATE.etiquetas = r[3]; STATE.ideaEtiquetas = r[4]; STATE.nexos = r[5];
     guardarCacheCategorias();
+    fusionarIdeasEnCola();
     notificar();
     if (!listo) { listo = true; document.dispatchEvent(new CustomEvent("nexo:estado-listo")); }
   };
 
   var RECARGA = {
     categorias: function () { return DB.listarCategorias().then(function (d) { STATE.categorias = d; guardarCacheCategorias(); }); },
-    ideas: function () { return DB.listarIdeas().then(function (d) { STATE.ideas = d; }); },
+    ideas: function () { return DB.listarIdeas().then(function (d) { STATE.ideas = d; fusionarIdeasEnCola(); }); },
     notas: function () { return DB.listarNotas().then(function (d) { STATE.notas = d; }); },
     etiquetas: function () { return DB.listarEtiquetas().then(function (d) { STATE.etiquetas = d; }); },
     idea_etiquetas: function () { return DB.listarIdeaEtiquetas().then(function (d) { STATE.ideaEtiquetas = d; }); },
@@ -91,6 +107,7 @@
 
   document.addEventListener("nexo:unlocked", function () {
     sembrarCacheCategorias();
+    fusionarIdeasEnCola(); // visibles ya, aunque cargarTodo() falle por falta de red
     STATE.cargarTodo();
     suscribirTiempoReal();
   });

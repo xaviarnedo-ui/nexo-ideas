@@ -22,6 +22,26 @@
 
   activar("tablero");
 
+  // El evento "nexo:cola-cambiada" existía pero nadie lo escuchaba: no había
+  // forma de saber que algo seguía sin subir, ni que algo había fallado.
+  var colaEstado = document.getElementById("cola-estado");
+
+  function pintarCola() {
+    if (!colaEstado) return;
+    var pendientes = DB.colaPendiente().length;
+    var fallidas = DB.colaFallida().length;
+    var partes = [];
+    if (pendientes) partes.push(pendientes + " sin sincronizar");
+    if (fallidas) partes.push(fallidas + " con error");
+    colaEstado.textContent = partes.join(" · ");
+    colaEstado.classList.toggle("cola-con-fallos", fallidas > 0);
+    colaEstado.hidden = !partes.length;
+  }
+
+  document.addEventListener("nexo:cola-cambiada", pintarCola);
+  window.addEventListener("online", pintarCola);
+  pintarCola();
+
   // Sin esto el sw.js nunca se instala y capturar sin cobertura —el motivo
   // de existir de la app— no funciona en frío.
   if ("serviceWorker" in navigator) {

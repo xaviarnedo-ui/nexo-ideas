@@ -7,6 +7,7 @@
 
   var SB = window.NEXO_DB;
   var COLA_KEY = "nexo-ideas-cola";
+  var COLA_FALLIDA_KEY = "nexo-ideas-cola-fallida";
 
   function uuid() {
     return crypto.randomUUID();
@@ -28,17 +29,55 @@
     guardarCola(cola);
   }
 
+  function leerColaFallida() {
+    try { return JSON.parse(localStorage.getItem(COLA_FALLIDA_KEY)) || []; }
+    catch (e) { return []; }
+  }
+
+  // Si la petición ni siquiera llegó a completarse (sin cobertura),
+  // supabase-js devuelve status 0; si el servidor contestó y rechazó la
+  // operación (clave duplicada, check, clave ajena...) viene el status HTTP
+  // real. Lo primero merece reintentarse; lo segundo no va a funcionar
+  // nunca por muchas vueltas que se le dé.
+  function errorDeResultado(r) {
+    if (!r || !r.error) return null;
+    var e = new Error(r.error.message || "Error de Supabase");
+    e.supabase = r.error;
+    e.status = r.status || 0;
+    e.rechazadoPorServidor = !!r.status;
+    return e;
+  }
+
   async function ejecutarOp(op) {
+    var r;
     if (op.operacion === "insert") {
-      var r1 = await SB.from(op.tabla).insert(op.payload);
-      if (r1.error) throw r1.error;
+      r = await SB.from(op.tabla).insert(op.payload);
     } else if (op.operacion === "update") {
-      var r2 = await SB.from(op.tabla).update(op.cambios).eq("id", op.id);
-      if (r2.error) throw r2.error;
+      r = await SB.from(op.tabla).update(op.cambios).eq("id", op.id);
     } else if (op.operacion === "delete") {
-      var r3 = await SB.from(op.tabla).delete().eq("id", op.id);
-      if (r3.error) throw r3.error;
+      r = await SB.from(op.tabla).delete().eq("id", op.id);
+    } else if (op.operacion === "delete_filtrado") {
+      // para tablas sin columna id propia (idea_etiquetas tiene pk compuesta)
+      var q = SB.from(op.tabla).delete();
+      op.filtros.forEach(function (f) { q = q.eq(f[0], f[1]); });
+      r = await q;
+    } else {
+      return;
     }
+    var e = errorDeResultado(r);
+    if (e) throw e;
+  }
+
+  function apartarFallida(op, e) {
+    var fallidas = leerColaFallida();
+    fallidas.push({
+      op: op,
+      error: (e && e.supabase) || { message: String(e && e.message) },
+      status: (e && e.status) || 0,
+      fecha: new Date().toISOString()
+    });
+    try { localStorage.setItem(COLA_FALLIDA_KEY, JSON.stringify(fallidas)); }
+    catch (err) { /* sin sitio: al menos no bloquea el resto de la cola */ }
   }
 
   var procesando = false;
@@ -54,7 +93,14 @@
           cola.shift();
           guardarCola(cola);
         } catch (e) {
-          break; // seguimos con red mala; se reintenta en el próximo trigger
+          if (!e || !e.rechazadoPorServidor) break; // red mala: se reintenta entera en el próximo trigger
+          // El servidor la rechazó: reintentarla no va a arreglarla nunca y
+          // dejarla al frente bloquearía todas las escrituras posteriores.
+          // Se aparta a un cubo aparte (inspeccionable con DB.colaFallida())
+          // y se sigue con el resto de la cola.
+          apartarFallida(cola[0], e);
+          cola.shift();
+          guardarCola(cola);
         }
       }
     } finally {
@@ -67,12 +113,16 @@
 
   // intenta escribir ya; si falla (red u otro error), encola y sigue
   // adelante de forma optimista con el mismo id que se generó en el cliente
-  async function escribirConCola(tabla, operacion, payload, idParaCola, cambiosParaCola) {
+  async function escribirConCola(tabla, operacion, payload, idParaCola, cambiosParaCola, filtros) {
+    var op = {
+      tabla: tabla, operacion: operacion, payload: payload,
+      id: idParaCola, cambios: cambiosParaCola, filtros: filtros
+    };
     try {
-      await ejecutarOp({ tabla: tabla, operacion: operacion, payload: payload, id: idParaCola, cambios: cambiosParaCola });
+      await ejecutarOp(op);
       return { pendiente: false };
     } catch (e) {
-      encolar({ tabla: tabla, operacion: operacion, payload: payload, id: idParaCola, cambios: cambiosParaCola });
+      encolar(op);
       return { pendiente: true };
     }
   }
@@ -158,13 +208,8 @@
     await escribirConCola("idea_etiquetas", "insert", fila);
   };
   DB.desetiquetarIdea = async function (ideaId, etiquetaId) {
-    try {
-      var r = await SB.from("idea_etiquetas").delete().eq("idea_id", ideaId).eq("etiqueta_id", etiquetaId);
-      if (r.error) throw r.error;
-    } catch (e) {
-      // caso raro offline: no hay id propio para encolar un delete por pk compuesta,
-      // así que se resuelve al vuelo en el próximo intento de listarIdeaEtiquetas()
-    }
+    await escribirConCola("idea_etiquetas", "delete_filtrado", null, null, null,
+      [["idea_id", ideaId], ["etiqueta_id", etiquetaId]]);
   };
 
   // ---- nexos ----
@@ -183,6 +228,9 @@
   };
 
   DB.colaPendiente = function () { return leerCola(); };
+  // operaciones que el servidor rechazó y que no se reintentan: no se pierden
+  // en silencio, quedan aquí para poder mirar qué falló y por qué
+  DB.colaFallida = function () { return leerColaFallida(); };
 
   window.DB = DB;
 })();

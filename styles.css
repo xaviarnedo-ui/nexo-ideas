@@ -64,6 +64,13 @@ input, textarea, select { font-family: var(--font-body); font-size: 1rem; }
   color: var(--text-muted); font-weight: 600; font-size: .9rem;
 }
 .tab[aria-current="page"] { background: var(--text); color: #fff; }
+/* Aviso de escrituras sin sincronizar (y de las que fallaron para siempre) */
+.cola-estado {
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 500;
+  padding: .2rem .55rem; border-radius: 999px;
+  background: var(--border); color: var(--text-muted);
+}
+.cola-estado.cola-con-fallos { background: var(--accent-investigacion); color: #fff; }
 #views { flex: 1; padding: 1.2rem; }
 .view[hidden] { display: none; }
 
