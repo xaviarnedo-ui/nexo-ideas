@@ -60,9 +60,13 @@
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js?v=1"></script>
-<script src="auth-gate.js?v=1"></script>
+<!-- state.js debe cargar ANTES que auth-gate.js: en una visita de vuelta
+     auth-gate.js desbloquea y lanza "nexo:unlocked" al cargarse, y si
+     state.js aún no ha registrado su listener el evento se pierde y la app
+     se queda vacía para siempre. -->
 <script src="db.js?v=1"></script>
 <script src="state.js?v=1"></script>
+<script src="auth-gate.js?v=1"></script>
 <script src="capture.js?v=1"></script>
 <script src="board.js?v=1"></script>
 <script src="detail.js?v=1"></script>
