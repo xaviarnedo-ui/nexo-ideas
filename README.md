@@ -34,7 +34,13 @@ cp .env.example .env   # una vez, con tus credenciales reales
 python3 nexo_cli.py listar ideas
 python3 nexo_cli.py crear notas '{"idea_id":"...", "contenido":"..."}'
 python3 nexo_cli.py actualizar ideas <id> '{"estado":"en_desarrollo"}'
+python3 nexo_cli.py borrar notas <id>
+python3 nexo_cli.py desetiquetar <idea_id> <etiqueta_id>
 ```
+
+`actualizar` y `borrar` filtran por `id`, así que no valen para
+`idea_etiquetas`, que usa la clave compuesta (`idea_id`, `etiqueta_id`):
+para quitarle una etiqueta a una idea está `desetiquetar`.
 
 ## Estructura de archivos
 
