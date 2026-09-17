@@ -43,9 +43,6 @@
     });
   }
 
-  // Cada listener va en su propio try: forEach aborta la iteración entera si
-  // uno lanza, así que un fallo en board.js dejaba sin avisar a detail.js,
-  // map.js y settings.js (todo lo registrado después).
   // Un aviso encima de las vistas, no en lugar de ellas: si hay categorías
   // cacheadas el tablero y la captura siguen siendo usables.
   function mostrarErrorDeCarga() {
@@ -65,6 +62,9 @@
     if (aviso && aviso.parentNode) aviso.parentNode.removeChild(aviso);
   }
 
+  // Cada listener va en su propio try: forEach aborta la iteración entera si
+  // uno lanza, así que un fallo en board.js dejaba sin avisar a detail.js,
+  // map.js y settings.js (todo lo registrado después).
   function notificar() {
     listeners.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Fallo al repintar una vista", e); }
