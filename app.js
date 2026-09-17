@@ -27,7 +27,7 @@
   var colaEstado = document.getElementById("cola-estado");
 
   function pintarCola() {
-    if (!colaEstado) return;
+    if (!colaEstado || !window.DB) return;
     var pendientes = DB.colaPendiente().length;
     var fallidas = DB.colaFallida().length;
     var partes = [];
