@@ -62,27 +62,40 @@
     return card;
   }
 
-  function render() {
-    var root = document.getElementById("vista-tablero");
-    if (!root) return;
-    root.innerHTML = "";
-    if (!STATE.categorias.length) return;
+  // La barra (buscador + chips de filtro) se construye una sola vez y
+  // sobrevive a los repintados: si se reconstruyera en cada render, el
+  // <input type="search"> se destruiría en cada tecla —render() se llama
+  // desde su propio evento "input"— y el foco saltaría fuera del buscador.
+  var barra = null;
+  var buscador = null;
+  var filtroBox = null;
+  var columnas = null;
+  var firmaEtiquetas = null;
 
-    var barra = document.createElement("div");
+  function construirBarra() {
+    barra = document.createElement("div");
     barra.className = "tablero-barra";
 
-    var buscador = document.createElement("input");
+    buscador = document.createElement("input");
     buscador.type = "search";
     buscador.placeholder = "Buscar...";
     buscador.value = filtroTexto;
     buscador.addEventListener("input", function () {
       filtroTexto = buscador.value.trim().toLowerCase();
-      render();
+      renderColumnas(); // solo las columnas: no se toca la barra
     });
     barra.appendChild(buscador);
 
-    var filtroBox = document.createElement("div");
+    filtroBox = document.createElement("div");
     filtroBox.className = "chip-group";
+    barra.appendChild(filtroBox);
+
+    columnas = document.createElement("div");
+    columnas.className = "tablero-columnas";
+  }
+
+  function renderChipsEtiqueta() {
+    filtroBox.innerHTML = "";
     STATE.etiquetas.forEach(function (t) {
       var chip = document.createElement("button");
       chip.type = "button";
@@ -93,15 +106,15 @@
       if (activo) { chip.style.background = "var(--text)"; chip.style.color = "#fff"; chip.style.borderColor = "var(--text)"; }
       chip.addEventListener("click", function () {
         filtroEtiquetaId = activo ? null : t.id;
+        firmaEtiquetas = null;
         render();
       });
       filtroBox.appendChild(chip);
     });
-    barra.appendChild(filtroBox);
-    root.appendChild(barra);
+  }
 
-    var columnas = document.createElement("div");
-    columnas.className = "tablero-columnas";
+  function renderColumnas() {
+    columnas.innerHTML = "";
     STATE.categorias.forEach(function (cat) {
       var ideas = STATE.ideas.filter(function (i) { return i.categoria_id === cat.id && coincide(i); });
       var col = document.createElement("section");
@@ -113,7 +126,32 @@
       ideas.forEach(function (idea) { col.appendChild(tarjeta(idea)); });
       columnas.appendChild(col);
     });
-    root.appendChild(columnas);
+  }
+
+  function render() {
+    var root = document.getElementById("vista-tablero");
+    if (!root) return;
+
+    if (!STATE.categorias.length) {
+      root.innerHTML = "";
+      barra = null; columnas = null; firmaEtiquetas = null;
+      return;
+    }
+
+    if (!barra || !root.contains(barra)) {
+      root.innerHTML = "";
+      construirBarra();
+      root.appendChild(barra);
+      root.appendChild(columnas);
+      firmaEtiquetas = null;
+    }
+
+    // los chips solo se rehacen si cambió la lista de etiquetas o cuál está
+    // activa, no en cada repintado
+    var firma = STATE.etiquetas.map(function (t) { return t.id + ":" + t.nombre; }).join("|") + "#" + filtroEtiquetaId;
+    if (firma !== firmaEtiquetas) { firmaEtiquetas = firma; renderChipsEtiqueta(); }
+
+    renderColumnas();
   }
 
   STATE.on(render);
