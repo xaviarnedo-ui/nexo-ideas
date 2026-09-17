@@ -22,12 +22,17 @@
   // El panel se repinta entero ante cualquier cambio de STATE, venga o no
   // de la idea abierta. Si llega un cambio de Realtime mientras se está
   // escribiendo (el guardado ocurre al blur), la reconstrucción se llevaría
-  // por delante lo tecleado y aún sin guardar. Mejor no repintar mientras
-  // el foco esté dentro del panel: el siguiente render lo recogerá.
+  // por delante lo tecleado y aún sin guardar.
+  // Solo se protegen los dos campos de texto libre que guardan al blur
+  // (título y cuerpo). Guardar cualquier INPUT/TEXTAREA/SELECT del panel
+  // sería demasiado: bloquearía también los repintados que piden los
+  // propios handlers del panel al terminar (añadir etiqueta con Enter,
+  // enviar el formulario de nota), que dejan el foco dentro del campo y
+  // cuyo resultado no se llegaría a ver.
   function editandoDentroDelPanel() {
     var activo = document.activeElement;
     if (!activo || !panel.contains(activo)) return false;
-    return activo.tagName === "INPUT" || activo.tagName === "TEXTAREA" || activo.tagName === "SELECT";
+    return activo.classList.contains("panel-titulo") || activo.classList.contains("panel-cuerpo");
   }
 
   function render() {
@@ -85,6 +90,7 @@
 
     var cuerpoTextarea = document.createElement("textarea");
     cuerpoTextarea.rows = 4; cuerpoTextarea.placeholder = "Desarrolla la idea...";
+    cuerpoTextarea.className = "panel-cuerpo"; // identidad para editandoDentroDelPanel()
     cuerpoTextarea.value = idea.cuerpo || "";
     cuerpoTextarea.addEventListener("blur", async function () {
       if (cuerpoTextarea.value !== (idea.cuerpo || "")) {
