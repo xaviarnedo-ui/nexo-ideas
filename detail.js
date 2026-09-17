@@ -19,8 +19,20 @@
     return creada;
   }
 
+  // El panel se repinta entero ante cualquier cambio de STATE, venga o no
+  // de la idea abierta. Si llega un cambio de Realtime mientras se está
+  // escribiendo (el guardado ocurre al blur), la reconstrucción se llevaría
+  // por delante lo tecleado y aún sin guardar. Mejor no repintar mientras
+  // el foco esté dentro del panel: el siguiente render lo recogerá.
+  function editandoDentroDelPanel() {
+    var activo = document.activeElement;
+    if (!activo || !panel.contains(activo)) return false;
+    return activo.tagName === "INPUT" || activo.tagName === "TEXTAREA" || activo.tagName === "SELECT";
+  }
+
   function render() {
     if (!ideaActualId) return;
+    if (editandoDentroDelPanel()) return;
     var idea = STATE.ideaPorId(ideaActualId);
     if (!idea) { cerrar(); return; }
 
