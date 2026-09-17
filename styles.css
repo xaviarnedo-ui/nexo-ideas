@@ -126,3 +126,17 @@ input, textarea, select { font-family: var(--font-body); font-size: 1rem; }
 .tarjeta-pendiente { font-size: .8rem; }
 .tarjeta-etiquetas { display: flex; gap: .3rem; flex-wrap: wrap; width: 100%; }
 .mini-etiqueta { font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); background: var(--border); border-radius: 4px; padding: .1rem .4rem; }
+
+/* ---- Panel de detalle ---- */
+.panel { display: flex; flex-direction: column; gap: .3rem; }
+.panel-cerrar { border: none; background: transparent; font-size: 1.1rem; align-self: flex-end; color: var(--text-muted); }
+.panel-titulo { font-family: var(--font-title); font-size: 1.3rem; font-weight: 600; border: none; border-bottom: 1px solid var(--border); padding: .3rem 0; margin-bottom: .6rem; width: 100%; }
+.panel select, .panel textarea { width: 100%; padding: .5rem .6rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: .6rem; }
+.panel-seccion { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.panel-seccion h3 { font-family: var(--font-mono); font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); font-weight: 500; }
+.nota-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: .6rem; margin-bottom: .5rem; }
+.nota-fuente { font-family: var(--font-mono); font-size: .75rem; color: var(--text-muted); margin: .3rem 0 0; }
+.nota-borrar { background: none; border: none; color: var(--accent-investigacion); font-size: .75rem; padding: .2rem 0; }
+.nota-form { display: flex; flex-direction: column; gap: .4rem; margin-top: .6rem; }
+.nota-form button { align-self: flex-start; padding: .4rem .8rem; border-radius: 8px; border: 1px solid var(--border); background: var(--text); color: #fff; }
+.panel-borrar-idea { margin-top: 1.4rem; background: none; border: 1px solid var(--accent-investigacion); color: var(--accent-investigacion); border-radius: 8px; padding: .5rem .8rem; }
