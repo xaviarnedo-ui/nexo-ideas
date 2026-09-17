@@ -140,3 +140,8 @@ input, textarea, select { font-family: var(--font-body); font-size: 1rem; }
 .nota-form { display: flex; flex-direction: column; gap: .4rem; margin-top: .6rem; }
 .nota-form button { align-self: flex-start; padding: .4rem .8rem; border-radius: 8px; border: 1px solid var(--border); background: var(--text); color: #fff; }
 .panel-borrar-idea { margin-top: 1.4rem; background: none; border: 1px solid var(--accent-investigacion); color: var(--accent-investigacion); border-radius: 8px; padding: .5rem .8rem; }
+
+/* ---- Mapa ---- */
+#vista-mapa { background: #0f1115; border-radius: var(--radius); margin: -1.2rem; padding: 1.2rem; min-height: calc(100vh - 130px); }
+.mapa-svg { width: 100%; height: auto; display: block; }
+.mapa-nodo:hover circle { filter: brightness(1.3); }
