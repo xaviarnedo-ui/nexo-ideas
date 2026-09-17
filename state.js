@@ -43,8 +43,32 @@
     });
   }
 
+  // Cada listener va en su propio try: forEach aborta la iteración entera si
+  // uno lanza, así que un fallo en board.js dejaba sin avisar a detail.js,
+  // map.js y settings.js (todo lo registrado después).
+  // Un aviso encima de las vistas, no en lugar de ellas: si hay categorías
+  // cacheadas el tablero y la captura siguen siendo usables.
+  function mostrarErrorDeCarga() {
+    var views = document.getElementById("views");
+    if (!views || document.getElementById("error-carga")) return;
+    var aviso = document.createElement("p");
+    aviso.id = "error-carga";
+    aviso.className = "error-carga";
+    aviso.textContent = navigator.onLine
+      ? "No se pudo conectar con Supabase. Revisa las credenciales en supabase-client.js."
+      : "Sin conexión: se muestra lo último guardado. Lo que captures se sincronizará al volver la red.";
+    views.insertBefore(aviso, views.firstChild);
+  }
+
+  function ocultarErrorDeCarga() {
+    var aviso = document.getElementById("error-carga");
+    if (aviso && aviso.parentNode) aviso.parentNode.removeChild(aviso);
+  }
+
   function notificar() {
-    listeners.forEach(function (fn) { fn(); });
+    listeners.forEach(function (fn) {
+      try { fn(); } catch (e) { console.error("Fallo al repintar una vista", e); }
+    });
   }
 
   STATE.on = function (fn) { listeners.push(fn); };
@@ -62,6 +86,7 @@
     STATE.etiquetas = r[3]; STATE.ideaEtiquetas = r[4]; STATE.nexos = r[5];
     guardarCacheCategorias();
     fusionarIdeasEnCola();
+    ocultarErrorDeCarga();
     notificar();
     if (!listo) { listo = true; document.dispatchEvent(new CustomEvent("nexo:estado-listo")); }
   };
@@ -108,7 +133,12 @@
   document.addEventListener("nexo:unlocked", function () {
     sembrarCacheCategorias();
     fusionarIdeasEnCola(); // visibles ya, aunque cargarTodo() falle por falta de red
-    STATE.cargarTodo();
+    // sin este catch, unas credenciales mal pegadas dejaban la app en blanco
+    // para siempre y sin ninguna pista de qué había pasado
+    STATE.cargarTodo().catch(function (e) {
+      console.error("No se pudo cargar el estado inicial", e);
+      mostrarErrorDeCarga();
+    });
     suscribirTiempoReal();
   });
 

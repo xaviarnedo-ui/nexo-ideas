@@ -72,6 +72,11 @@ input, textarea, select { font-family: var(--font-body); font-size: 1rem; }
 }
 .cola-estado.cola-con-fallos { background: var(--accent-investigacion); color: #fff; }
 #views { flex: 1; padding: 1.2rem; }
+.error-carga {
+  margin: 0 0 1rem; padding: .7rem .9rem; border-radius: 8px;
+  background: #fff1f2; border: 1px solid var(--accent-investigacion);
+  color: var(--accent-investigacion); font-size: .88rem;
+}
 .view[hidden] { display: none; }
 
 /* ---- Botón flotante de captura ---- */
