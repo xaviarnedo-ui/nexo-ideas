@@ -9,7 +9,7 @@
   var CATEGORIAS_CACHE_KEY = "nexo-ideas-categorias-cache";
 
   var STATE = {
-    categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: [], fotos: [], mensajes: []
+    categorias: [], ideas: [], notas: [], etiquetas: [], ideaEtiquetas: [], nexos: [], fotos: [], mensajes: [], documentos: []
   };
 
   // Solo las categorías: en un arranque en frío sin red, capture.js no puede
@@ -91,6 +91,8 @@
     catch (e) { console.error("No se pudieron cargar las fotos (¿falta supabase/fotos.sql?)", e); }
     try { STATE.mensajes = await DB.listarMensajes(); }
     catch (e) { console.error("No se pudieron cargar los mensajes (¿falta supabase/mensajes.sql?)", e); }
+    try { STATE.documentos = await DB.listarDocumentos(); }
+    catch (e) { console.error("No se pudieron cargar los documentos (¿falta supabase/documentos.sql?)", e); }
     guardarCacheCategorias();
     fusionarIdeasEnCola();
     ocultarErrorDeCarga();
@@ -106,7 +108,8 @@
     idea_etiquetas: function () { return DB.listarIdeaEtiquetas().then(function (d) { STATE.ideaEtiquetas = d; }); },
     nexos: function () { return DB.listarNexos().then(function (d) { STATE.nexos = d; }); },
     fotos: function () { return DB.listarFotos().then(function (d) { STATE.fotos = d; }); },
-    mensajes: function () { return DB.listarMensajes().then(function (d) { STATE.mensajes = d; }); }
+    mensajes: function () { return DB.listarMensajes().then(function (d) { STATE.mensajes = d; }); },
+    documentos: function () { return DB.listarDocumentos().then(function (d) { STATE.documentos = d; }); }
   };
 
   function suscribirTiempoReal() {
@@ -140,6 +143,9 @@
   };
   STATE.fotosDeIdea = function (ideaId) {
     return STATE.fotos.filter(function (f) { return f.idea_id === ideaId; });
+  };
+  STATE.documentosDeIdea = function (ideaId) {
+    return STATE.documentos.filter(function (d) { return d.idea_id === ideaId; });
   };
 
   document.addEventListener("nexo:unlocked", function () {

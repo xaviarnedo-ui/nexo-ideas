@@ -274,5 +274,31 @@
     return Object.assign({}, fila, { estado: "pendiente", _pendiente: estado.pendiente });
   };
 
+  // ---- documentos ----
+  // Mismo patrón que fotos: la subida del binario no pasa por la cola
+  // offline, la fila de metadatos sí.
+  DB.listarDocumentos = async function () {
+    var r = await SB.from("documentos").select("*").order("created_at");
+    if (r.error) throw r.error;
+    return r.data;
+  };
+  DB.urlDocumento = function (storagePath) {
+    return SB.storage.from("documentos").getPublicUrl(storagePath).data.publicUrl;
+  };
+  DB.subirDocumento = async function (ideaId, blob, nombre) {
+    var id = uuid();
+    var extension = (nombre.match(/\.[^.]+$/) || [""])[0];
+    var path = ideaId + "/" + id + extension;
+    var subida = await SB.storage.from("documentos").upload(path, blob, { contentType: blob.type || "application/octet-stream" });
+    if (subida.error) throw subida.error;
+    var fila = { id: id, idea_id: ideaId, storage_path: path, nombre: nombre };
+    var estado = await escribirConCola("documentos", "insert", fila);
+    return Object.assign({}, fila, { _pendiente: estado.pendiente });
+  };
+  DB.borrarDocumento = async function (id, storagePath) {
+    await SB.storage.from("documentos").remove([storagePath]);
+    await escribirConCola("documentos", "delete", null, id);
+  };
+
   window.DB = DB;
 })();

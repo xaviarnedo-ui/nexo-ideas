@@ -253,6 +253,49 @@
     fotosSeccion.appendChild(fotoEstado);
     panel.appendChild(fotosSeccion);
 
+    // ---- Documentos ----
+    var docsSeccion = document.createElement("div"); docsSeccion.className = "panel-seccion";
+    var docsTitulo = document.createElement("h3"); docsTitulo.textContent = "Documentos"; docsSeccion.appendChild(docsTitulo);
+    STATE.documentosDeIdea(idea.id).forEach(function (doc) {
+      var item = document.createElement("div"); item.className = "documento-item";
+      var link = document.createElement("a");
+      link.href = DB.urlDocumento(doc.storage_path);
+      link.target = "_blank"; link.rel = "noopener";
+      link.textContent = "📄 " + doc.nombre;
+      item.appendChild(link);
+      var borrarDocBtn = document.createElement("button");
+      borrarDocBtn.type = "button"; borrarDocBtn.className = "documento-borrar"; borrarDocBtn.textContent = "✕";
+      borrarDocBtn.addEventListener("click", async function () {
+        if (!confirm('¿Borrar "' + doc.nombre + '"?')) return;
+        await DB.borrarDocumento(doc.id, doc.storage_path);
+        STATE.documentos = STATE.documentos.filter(function (d) { return d.id !== doc.id; });
+        STATE.notificar();
+      });
+      item.appendChild(borrarDocBtn);
+      docsSeccion.appendChild(item);
+    });
+
+    var docEstado = document.createElement("p"); docEstado.className = "documento-estado"; docEstado.hidden = true;
+    var docInput = document.createElement("input");
+    docInput.type = "file"; docInput.accept = "application/pdf"; docInput.className = "documento-input";
+    docInput.addEventListener("change", async function () {
+      var file = docInput.files[0];
+      if (!file) return;
+      docEstado.hidden = false; docEstado.textContent = "Subiendo documento...";
+      try {
+        var doc = await DB.subirDocumento(idea.id, file, file.name);
+        STATE.documentos.push(doc);
+        docInput.value = "";
+        docEstado.hidden = true;
+        STATE.notificar();
+      } catch (e) {
+        docEstado.textContent = "No se pudo subir el documento. Comprueba tu conexión e inténtalo de nuevo.";
+      }
+    });
+    docsSeccion.appendChild(docInput);
+    docsSeccion.appendChild(docEstado);
+    panel.appendChild(docsSeccion);
+
     // ---- Nexos ----
     var nexosSeccion = document.createElement("div"); nexosSeccion.className = "panel-seccion";
     var nexosTitulo = document.createElement("h3"); nexosTitulo.textContent = "Nexos"; nexosSeccion.appendChild(nexosTitulo);

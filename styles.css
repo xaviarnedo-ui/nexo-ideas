@@ -186,6 +186,14 @@ input, textarea, select { font-family: var(--font-body); font-size: 1rem; }
 .foto-input { width: 100%; margin-bottom: .3rem; }
 .foto-estado { font-size: .8rem; color: var(--text-muted); }
 
+/* ---- Documentos ---- */
+.documento-item { display: flex; align-items: center; justify-content: space-between; gap: .5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: .5rem .7rem; margin-bottom: .4rem; }
+.documento-item a { color: var(--text); font-weight: 600; text-decoration: none; word-break: break-word; }
+.documento-item a:hover { text-decoration: underline; }
+.documento-borrar { background: none; border: none; color: var(--accent-investigacion); font-size: .85rem; padding: 0; flex-shrink: 0; }
+.documento-input { width: 100%; margin-bottom: .3rem; }
+.documento-estado { font-size: .8rem; color: var(--text-muted); }
+
 /* ---- Mapa ---- */
 #vista-mapa { background: #0f1115; border-radius: var(--radius); margin: -1.2rem; padding: 1.2rem; min-height: calc(100vh - 130px); }
 .mapa-svg { width: 100%; height: auto; display: block; }
